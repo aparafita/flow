@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.8.1" />
+<title>flow.conditioner API documentation</title>
+<meta name="description" content="Implementations for Flow-Conditioners." />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script async src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS_CHTML'></script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>flow.conditioner</code></h1>
+</header>
+<section id="section-intro">
+<p>Implementations for Flow-Conditioners.</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+Implementations for Flow-Conditioners.
+&#34;&#34;&#34;
+
+import numpy as np
+
+import torch
+from torch import nn
+
+import torch.nn.functional as F
+
+from .flow import Conditioner
+
+
+def default_net(
+    input_dim, output_dim, n_layers=3,
+    hidden_dim=(100, 50), activation=nn.ReLU, 
+):
+    &#34;&#34;&#34;Create a basic feed-forward network.
+
+    Args:
+        input_dim (int): input dimensionality.
+        output_dim (int): output dimensionality.
+        n_layers (int): number of layers in the network,
+            counting input and output layers.
+            For example, input + hidden + output is n_layers = 3.
+        hidden_dim (list): list with the dimensionality of each hidden layer.
+            Must contain n_layers - 1 non-negative ints.
+        activation (torch.nn.Module): Module class to instantiate 
+            as activation layer after each linear layer.
+    &#34;&#34;&#34;
+
+    assert isinstance(hidden_dim, (tuple, list)) 
+    assert len(hidden_dim) == n_layers - 1
+    assert all(isinstance(x, int) and x &gt; 0 for x in hidden_dim)
+
+    def create_layer(n_layer, n_step):
+        if n_step == 0:
+            i = input_dim if n_layer == 0 else hidden_dim[n_layer - 1]
+            o = output_dim if n_layer == n_layers - 1 else hidden_dim[n_layer]
+
+            return nn.Linear(i, o)
+        else:
+            if n_layer == n_layers:
+                return None
+            else:
+                return activation()
+
+    return nn.Sequential(*(
+        layer
+        for layer in (
+            create_layer(n_layer, n_step)
+            for n_layer in range(n_layers)
+            for n_step in range(2)
+        )
+        if layer is not None
+    ))
+
+
+class ConditionerNet(nn.Module):
+    &#34;&#34;&#34;Conditioner parameters network.
+
+    Used to compute the parameters h passed to a transformer.
+    If called with a void tensor (in an autoregressive setting, the first step),
+    returns a learnable tensor containing the required result.
+    &#34;&#34;&#34;
+
+    def __init__(
+        self, 
+        input_dim, output_dim, net=default_net, params_init=torch.randn
+    ):
+        &#34;&#34;&#34;
+        Args:
+            input_dim (int): input dimensionality.
+            output_dim (int): output dimensionality. 
+                Total dimension of all parameters combined.
+        &#34;&#34;&#34;
+        super().__init__()
+
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        if input_dim:
+            self.net = net(input_dim, output_dim)
+        else:
+            self.parameter = nn.Parameter(params_init(1, output_dim))
+
+    def forward(self, x):
+        &#34;&#34;&#34;Feed-forward pass.&#34;&#34;&#34;
+        if self.input_dim:
+            return self.net(x)
+        else:
+            return self.parameter.repeat(x.size(0), 1) # n == batch size
+
+
+class AutoregressiveNaive(Conditioner):
+    &#34;&#34;&#34;Naive Autoregressive Conditioner.
+
+    Implements a separate network for each dimension&#39;s h parameters.
+    &#34;&#34;&#34;
+
+    def __init__(self, trnf, net=None, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            net (class): torch.nn.Module class that computes the parameters.
+                If None, defaults to `ConditionerNet` with `default_net`.
+        &#34;&#34;&#34;
+        super().__init__(trnf, **kwargs)
+
+        if net is None:
+            net = ConditionerNet
+
+        self.nets = nn.ModuleList([
+            net(idim + self.cond_dim, self.trnf.h_dim)
+            for idim in range(self.dim)
+        ])
+
+    # Override methods
+    def _h(self, x, cond=None, start=0):
+        if self.cond_dim &gt; 0:
+            if cond is None:
+                raise ValueError(&#39;cond can\&#39;t be None if cond_dim &gt; 0&#39;)
+            if cond.size(1) != self.cond_dim:
+                raise ValueError(
+                    f&#39;cond dim ({cond.size(1)}) &#39;
+                    &#39;doesn\&#39;t fit cond_dim ({self.cond_dim})&#39;
+                )
+
+        assert 0 &lt;= start and start &lt;= min(self.dim - 1, x.size(1))
+        x = self._prepend_cond(x, cond)
+
+        return torch.cat([
+            net(x[:, :self.cond_dim + i])
+            for i, net in enumerate(self.nets[start:], start)
+            if (x.size(1) == self.cond_dim and i == 0) or 
+                i &lt;= x.size(1) - self.cond_dim
+        ], dim=1)
+
+    def _invert(self, u, cond=None, log_det=False):
+        x = u[:, :0] # (n, 0) tensor
+        
+        # Invert dimension per dimension sequentially
+        for i, net in enumerate(self.nets):
+            # Obtain h_i from previously computed x
+            h_i = self._h(x, cond=cond, start=i)
+            x_i = self.trnf(u[:, [i]], h_i, invert=True)
+            x = torch.cat([x, x_i], 1)
+
+        if log_det:
+            h = self._h(x, cond=cond)
+            _, log_det = self.trnf(u, h, log_det=True, invert=True)
+            return x, log_det
+        else:
+            return x</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="flow.conditioner.default_net"><code class="name flex">
+<span>def <span class="ident">default_net</span></span>(<span>input_dim, output_dim, n_layers=3, hidden_dim=(100, 50), activation=torch.nn.modules.activation.ReLU)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create a basic feed-forward network.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>input_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>input dimensionality.</dd>
+<dt><strong><code>output_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>output dimensionality.</dd>
+<dt><strong><code>n_layers</code></strong> :&ensp;<code>int</code></dt>
+<dd>number of layers in the network,
+counting input and output layers.
+For example, input + hidden + output is n_layers = 3.</dd>
+<dt><strong><code>hidden_dim</code></strong> :&ensp;<code>list</code></dt>
+<dd>list with the dimensionality of each hidden layer.
+Must contain n_layers - 1 non-negative ints.</dd>
+<dt><strong><code>activation</code></strong> :&ensp;<code>torch.nn.Module</code></dt>
+<dd>Module class to instantiate
+as activation layer after each linear layer.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def default_net(
+    input_dim, output_dim, n_layers=3,
+    hidden_dim=(100, 50), activation=nn.ReLU, 
+):
+    &#34;&#34;&#34;Create a basic feed-forward network.
+
+    Args:
+        input_dim (int): input dimensionality.
+        output_dim (int): output dimensionality.
+        n_layers (int): number of layers in the network,
+            counting input and output layers.
+            For example, input + hidden + output is n_layers = 3.
+        hidden_dim (list): list with the dimensionality of each hidden layer.
+            Must contain n_layers - 1 non-negative ints.
+        activation (torch.nn.Module): Module class to instantiate 
+            as activation layer after each linear layer.
+    &#34;&#34;&#34;
+
+    assert isinstance(hidden_dim, (tuple, list)) 
+    assert len(hidden_dim) == n_layers - 1
+    assert all(isinstance(x, int) and x &gt; 0 for x in hidden_dim)
+
+    def create_layer(n_layer, n_step):
+        if n_step == 0:
+            i = input_dim if n_layer == 0 else hidden_dim[n_layer - 1]
+            o = output_dim if n_layer == n_layers - 1 else hidden_dim[n_layer]
+
+            return nn.Linear(i, o)
+        else:
+            if n_layer == n_layers:
+                return None
+            else:
+                return activation()
+
+    return nn.Sequential(*(
+        layer
+        for layer in (
+            create_layer(n_layer, n_step)
+            for n_layer in range(n_layers)
+            for n_step in range(2)
+        )
+        if layer is not None
+    ))</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="flow.conditioner.AutoregressiveNaive"><code class="flex name class">
+<span>class <span class="ident">AutoregressiveNaive</span></span>
+<span>(</span><span>trnf, net=None, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Naive Autoregressive Conditioner.</p>
+<p>Implements a separate network for each dimension's h parameters.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>net</code></strong> :&ensp;<code>class</code></dt>
+<dd>torch.nn.Module class that computes the parameters.
+If None, defaults to <code><a title="flow.conditioner.ConditionerNet" href="#flow.conditioner.ConditionerNet">ConditionerNet</a></code> with <code><a title="flow.conditioner.default_net" href="#flow.conditioner.default_net">default_net()</a></code>.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AutoregressiveNaive(Conditioner):
+    &#34;&#34;&#34;Naive Autoregressive Conditioner.
+
+    Implements a separate network for each dimension&#39;s h parameters.
+    &#34;&#34;&#34;
+
+    def __init__(self, trnf, net=None, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            net (class): torch.nn.Module class that computes the parameters.
+                If None, defaults to `ConditionerNet` with `default_net`.
+        &#34;&#34;&#34;
+        super().__init__(trnf, **kwargs)
+
+        if net is None:
+            net = ConditionerNet
+
+        self.nets = nn.ModuleList([
+            net(idim + self.cond_dim, self.trnf.h_dim)
+            for idim in range(self.dim)
+        ])
+
+    # Override methods
+    def _h(self, x, cond=None, start=0):
+        if self.cond_dim &gt; 0:
+            if cond is None:
+                raise ValueError(&#39;cond can\&#39;t be None if cond_dim &gt; 0&#39;)
+            if cond.size(1) != self.cond_dim:
+                raise ValueError(
+                    f&#39;cond dim ({cond.size(1)}) &#39;
+                    &#39;doesn\&#39;t fit cond_dim ({self.cond_dim})&#39;
+                )
+
+        assert 0 &lt;= start and start &lt;= min(self.dim - 1, x.size(1))
+        x = self._prepend_cond(x, cond)
+
+        return torch.cat([
+            net(x[:, :self.cond_dim + i])
+            for i, net in enumerate(self.nets[start:], start)
+            if (x.size(1) == self.cond_dim and i == 0) or 
+                i &lt;= x.size(1) - self.cond_dim
+        ], dim=1)
+
+    def _invert(self, u, cond=None, log_det=False):
+        x = u[:, :0] # (n, 0) tensor
+        
+        # Invert dimension per dimension sequentially
+        for i, net in enumerate(self.nets):
+            # Obtain h_i from previously computed x
+            h_i = self._h(x, cond=cond, start=i)
+            x_i = self.trnf(u[:, [i]], h_i, invert=True)
+            x = torch.cat([x, x_i], 1)
+
+        if log_det:
+            h = self._h(x, cond=cond)
+            _, log_det = self.trnf(u, h, log_det=True, invert=True)
+            return x, log_det
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Conditioner" href="flow.html#flow.flow.Conditioner">Conditioner</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Conditioner" href="flow.html#flow.flow.Conditioner">Conditioner</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Conditioner.conditional" href="flow.html#flow.flow.Conditioner.conditional">conditional</a></code></li>
+<li><code><a title="flow.flow.Conditioner.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Conditioner.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Conditioner.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Conditioner.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Conditioner.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Conditioner.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Conditioner.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Conditioner.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.conditioner.ConditionerNet"><code class="flex name class">
+<span>class <span class="ident">ConditionerNet</span></span>
+<span>(</span><span>input_dim, output_dim, net=&lt;function default_net&gt;, params_init=&lt;built-in method randn of type object&gt;)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Conditioner parameters network.</p>
+<p>Used to compute the parameters h passed to a transformer.
+If called with a void tensor (in an autoregressive setting, the first step),
+returns a learnable tensor containing the required result.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>input_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>input dimensionality.</dd>
+<dt><strong><code>output_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>output dimensionality.
+Total dimension of all parameters combined.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ConditionerNet(nn.Module):
+    &#34;&#34;&#34;Conditioner parameters network.
+
+    Used to compute the parameters h passed to a transformer.
+    If called with a void tensor (in an autoregressive setting, the first step),
+    returns a learnable tensor containing the required result.
+    &#34;&#34;&#34;
+
+    def __init__(
+        self, 
+        input_dim, output_dim, net=default_net, params_init=torch.randn
+    ):
+        &#34;&#34;&#34;
+        Args:
+            input_dim (int): input dimensionality.
+            output_dim (int): output dimensionality. 
+                Total dimension of all parameters combined.
+        &#34;&#34;&#34;
+        super().__init__()
+
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        if input_dim:
+            self.net = net(input_dim, output_dim)
+        else:
+            self.parameter = nn.Parameter(params_init(1, output_dim))
+
+    def forward(self, x):
+        &#34;&#34;&#34;Feed-forward pass.&#34;&#34;&#34;
+        if self.input_dim:
+            return self.net(x)
+        else:
+            return self.parameter.repeat(x.size(0), 1) # n == batch size</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="flow.conditioner.ConditionerNet.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, x)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Feed-forward pass.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, x):
+    &#34;&#34;&#34;Feed-forward pass.&#34;&#34;&#34;
+    if self.input_dim:
+        return self.net(x)
+    else:
+        return self.parameter.repeat(x.size(0), 1) # n == batch size</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="flow" href="index.html">flow</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="flow.conditioner.default_net" href="#flow.conditioner.default_net">default_net</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="flow.conditioner.AutoregressiveNaive" href="#flow.conditioner.AutoregressiveNaive">AutoregressiveNaive</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.conditioner.ConditionerNet" href="#flow.conditioner.ConditionerNet">ConditionerNet</a></code></h4>
+<ul class="">
+<li><code><a title="flow.conditioner.ConditionerNet.forward" href="#flow.conditioner.ConditionerNet.forward">forward</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.8.1</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>
