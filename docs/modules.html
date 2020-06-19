@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.8.1" />
+<title>flow.modules API documentation</title>
+<meta name="description" content="Miscellaneous Flows." />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script async src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS_CHTML'></script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>flow.modules</code></h1>
+</header>
+<section id="section-intro">
+<p>Miscellaneous Flows.</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+Miscellaneous Flows.
+&#34;&#34;&#34;
+
+import numpy as np
+import torch
+from torch import nn
+
+from .flow import Flow
+from .utils import softplus, softplus_inv, logsigmoid
+
+
+class Affine(Flow):
+    &#34;&#34;&#34;Learnable Affine Flow.
+
+    Applies weight[i] * x[i] + bias[i], 
+    where weight and bias are learnable parameters.
+    &#34;&#34;&#34;
+
+    def __init__(self, weight=None, bias=None, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            weight (torch.Tensor): initial value for the weight parameter. 
+                If None, initialized to torch.ones(1, self.dim).
+            bias (torch.Tensor): initial value for the bias parameter. 
+                If None, initialized to torch.zeros(1, self.dim).
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        if weight is None:
+            weight = torch.ones(1, self.dim)
+
+        assert (weight &gt; 0).all()
+        self.log_weight = nn.Parameter(torch.log(weight))
+
+        if bias is None:
+            bias = torch.zeros(1, self.dim)
+
+        self.bias = nn.Parameter(bias)
+
+    def _log_det(self):
+        &#34;&#34;&#34;Used to compute _log_det for _transform.&#34;&#34;&#34;
+        return self.log_weight.sum(dim=1)
+
+    def _h(self):
+        &#34;&#34;&#34;Compute the parameters for this flow.&#34;&#34;&#34;
+        return torch.exp(self.log_weight), self.bias
+
+    def _transform(self, x, log_det=False, **kwargs):
+        weight, bias = self._h()
+
+        u = weight * x + bias
+
+        if log_det:
+            return u, self._log_det()
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        weight, bias = self._h()
+
+        x = (u - bias) / weight
+
+        if log_det:
+            return x, -self._log_det()
+        else:
+            return x
+
+
+class Sigmoid(Flow):
+    &#34;&#34;&#34;Sigmoid Flow.&#34;&#34;&#34;
+
+    def __init__(self, alpha=1., **kwargs):
+        r&#34;&#34;&#34;
+        Args:
+            alpha (float): alpha parameter for the sigmoid function: 
+                \(s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}\).
+                Must be bigger than 0.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        self.alpha = alpha
+
+    def _log_det(self, x):
+        &#34;&#34;&#34;Return log|det J_T|, where T: x -&gt; u.&#34;&#34;&#34;
+
+        return (
+            np.log(self.alpha) + 
+            2 * logsigmoid(x, alpha=alpha) +
+            -self.alpha * x
+        ).sum(dim=1)
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = torch.sigmoid(self.alpha * x)
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = -torch.log(1 / self.alpha / u - 1)
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x
+
+
+class Softplus(Flow):
+    &#34;&#34;&#34;Softplus Flow.&#34;&#34;&#34;
+
+    def __init__(self, threshold=20., eps=1e-6, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            threshold (float): values above this revert to a linear function. 
+                Default: 20.
+            eps (float): lower-bound to the softplus output.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        assert threshold &gt; 0 and eps &gt; 0
+        self.threshold = threshold
+        self.eps = eps
+
+    def _log_det(self, x):
+        return logsigmoid(x).sum(dim=1)
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = softplus(x, threshold=self.threshold, eps=self.eps)
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = softplus_inv(u, threshold=self.threshold, eps=self.eps)
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x 
+
+
+class LogSigmoid(Flow):
+    &#34;&#34;&#34;LogSigmoid Flow, defined for numerical stability.&#34;&#34;&#34;
+
+    def __init__(self, alpha=1., **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            alpha (float): alpha parameter used by the `Sigmoid`.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        self.alpha = alpha
+
+    def _log_det(self, x):
+        &#34;&#34;&#34;Return log|det J_T|, where T: x -&gt; u.&#34;&#34;&#34;
+
+        return logsigmoid(-self.alpha * x) + np.log(self.alpha)
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = logsigmoid(x, alpha=self.alpha)
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = -softplus_inv(-u) / self.alpha
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x
+    
+
+class LeakyReLU(Flow):
+    &#34;&#34;&#34;LeakyReLU Flow.&#34;&#34;&#34;
+
+    def __init__(self, negative_slope=0.01, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            negative_slope (float): slope used for those x &lt; 0,
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        self.negative_slope = negative_slope
+
+    def _log_det(self, x):
+        return torch.where(
+            x &gt;= 0, 
+            torch.zeros_like(x), 
+            torch.ones_like(x) * np.log(self.negative_slope)
+        )
+
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = torch.where(x &gt;= 0, x, x * self.negative_slope)
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = torch.where(u &gt;= 0, u, u / self.negative_slope)
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x
+
+
+class BatchNorm(Flow):
+    &#34;&#34;&#34;Perform BatchNormalization as a Flow class.
+
+    Note that if you want ActNorm, you can set momentum to 0
+    so that batch_statistics only take into account the first batch 
+    passed through the system (including the one from warm_start).
+    &#34;&#34;&#34;
+
+    def __init__(self, momentum=.1, eps=1e-5, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            momentum (float): value used for the moving average
+                of batch statistics. Must be between 0 and 1.
+            eps (float): lower-bound for the batch-scale tensor.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        assert 0 &lt;= momentum and momentum &lt;= 1
+
+        self.register_buffer(&#39;eps&#39;, torch.tensor(eps))
+        self.register_buffer(&#39;momentum&#39;, torch.tensor(momentum))
+
+        self.register_buffer(&#39;updates&#39;, torch.tensor(0))
+
+        self.register_buffer(&#39;batch_loc&#39;, torch.zeros(1, self.dim))
+        self.register_buffer(&#39;batch_scale&#39;, torch.ones(1, self.dim))
+
+        self.loc = nn.Parameter(torch.zeros(1, self.dim))
+        self.scale = nn.Parameter(torch.zeros(1, self.dim))
+
+    def _update(self, x):
+        with torch.no_grad():
+            bloc = x.mean(0, keepdim=True)
+            bscale = x.std(0, keepdim=True) + self.eps
+
+            if self.updates.data == 0:
+                self.batch_loc = bloc
+                self.batch_scale = bscale
+            else:
+                m = self.momentum
+                self.batch_loc = (1 - m) * self.batch_loc + m * bloc
+                self.batch_scale = (1 - m) * self.batch_scale + m * bscale
+
+            self.updates += 1
+
+    def warm_start(self, x):
+        self._update(x)
+
+        return self
+
+    def _activation(self, x=None, update=None):
+        if update:
+            assert x is not None
+            self._update(x)
+
+        bloc, bscale = self.batch_loc, self.batch_scale
+        loc, scale = self.loc, self.scale
+
+        # Note that batch_scale does not use activation,
+        # since it should be set by warm_start directly.
+        scale = torch.exp(scale) + self.eps
+
+        return bloc, bscale, loc, scale
+
+    def _log_det(self, scale, bscale):
+        return (torch.log(scale) - torch.log(bscale)).sum(dim=1)
+
+    def _transform(self, x, log_det=False, **kwargs):
+        bloc, bscale, loc, scale = self._activation(x, update=self.training)
+        u = scale * ((x - bloc) / bscale) + loc
+        
+        if log_det:
+            log_det = self._log_det(scale, bscale)
+            return u, log_det
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        bloc, bscale, loc, scale = self._activation(update=False)
+        x = (u - loc) / scale * bscale + bloc
+        
+        if log_det:
+            log_det = -self._log_det(scale, bscale)
+            return x, log_det
+        else:
+            return x</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="flow.modules.Affine"><code class="flex name class">
+<span>class <span class="ident">Affine</span></span>
+<span>(</span><span>weight=None, bias=None, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Learnable Affine Flow.</p>
+<p>Applies weight[i] * x[i] + bias[i],
+where weight and bias are learnable parameters.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>weight</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>initial value for the weight parameter.
+If None, initialized to torch.ones(1, self.dim).</dd>
+<dt><strong><code>bias</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>initial value for the bias parameter.
+If None, initialized to torch.zeros(1, self.dim).</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Affine(Flow):
+    &#34;&#34;&#34;Learnable Affine Flow.
+
+    Applies weight[i] * x[i] + bias[i], 
+    where weight and bias are learnable parameters.
+    &#34;&#34;&#34;
+
+    def __init__(self, weight=None, bias=None, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            weight (torch.Tensor): initial value for the weight parameter. 
+                If None, initialized to torch.ones(1, self.dim).
+            bias (torch.Tensor): initial value for the bias parameter. 
+                If None, initialized to torch.zeros(1, self.dim).
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        if weight is None:
+            weight = torch.ones(1, self.dim)
+
+        assert (weight &gt; 0).all()
+        self.log_weight = nn.Parameter(torch.log(weight))
+
+        if bias is None:
+            bias = torch.zeros(1, self.dim)
+
+        self.bias = nn.Parameter(bias)
+
+    def _log_det(self):
+        &#34;&#34;&#34;Used to compute _log_det for _transform.&#34;&#34;&#34;
+        return self.log_weight.sum(dim=1)
+
+    def _h(self):
+        &#34;&#34;&#34;Compute the parameters for this flow.&#34;&#34;&#34;
+        return torch.exp(self.log_weight), self.bias
+
+    def _transform(self, x, log_det=False, **kwargs):
+        weight, bias = self._h()
+
+        u = weight * x + bias
+
+        if log_det:
+            return u, self._log_det()
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        weight, bias = self._h()
+
+        x = (u - bias) / weight
+
+        if log_det:
+            return x, -self._log_det()
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.modules.BatchNorm"><code class="flex name class">
+<span>class <span class="ident">BatchNorm</span></span>
+<span>(</span><span>momentum=0.1, eps=1e-05, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Perform BatchNormalization as a Flow class.</p>
+<p>Note that if you want ActNorm, you can set momentum to 0
+so that batch_statistics only take into account the first batch
+passed through the system (including the one from warm_start).</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>momentum</code></strong> :&ensp;<code>float</code></dt>
+<dd>value used for the moving average
+of batch statistics. Must be between 0 and 1.</dd>
+<dt><strong><code>eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>lower-bound for the batch-scale tensor.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class BatchNorm(Flow):
+    &#34;&#34;&#34;Perform BatchNormalization as a Flow class.
+
+    Note that if you want ActNorm, you can set momentum to 0
+    so that batch_statistics only take into account the first batch 
+    passed through the system (including the one from warm_start).
+    &#34;&#34;&#34;
+
+    def __init__(self, momentum=.1, eps=1e-5, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            momentum (float): value used for the moving average
+                of batch statistics. Must be between 0 and 1.
+            eps (float): lower-bound for the batch-scale tensor.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        assert 0 &lt;= momentum and momentum &lt;= 1
+
+        self.register_buffer(&#39;eps&#39;, torch.tensor(eps))
+        self.register_buffer(&#39;momentum&#39;, torch.tensor(momentum))
+
+        self.register_buffer(&#39;updates&#39;, torch.tensor(0))
+
+        self.register_buffer(&#39;batch_loc&#39;, torch.zeros(1, self.dim))
+        self.register_buffer(&#39;batch_scale&#39;, torch.ones(1, self.dim))
+
+        self.loc = nn.Parameter(torch.zeros(1, self.dim))
+        self.scale = nn.Parameter(torch.zeros(1, self.dim))
+
+    def _update(self, x):
+        with torch.no_grad():
+            bloc = x.mean(0, keepdim=True)
+            bscale = x.std(0, keepdim=True) + self.eps
+
+            if self.updates.data == 0:
+                self.batch_loc = bloc
+                self.batch_scale = bscale
+            else:
+                m = self.momentum
+                self.batch_loc = (1 - m) * self.batch_loc + m * bloc
+                self.batch_scale = (1 - m) * self.batch_scale + m * bscale
+
+            self.updates += 1
+
+    def warm_start(self, x):
+        self._update(x)
+
+        return self
+
+    def _activation(self, x=None, update=None):
+        if update:
+            assert x is not None
+            self._update(x)
+
+        bloc, bscale = self.batch_loc, self.batch_scale
+        loc, scale = self.loc, self.scale
+
+        # Note that batch_scale does not use activation,
+        # since it should be set by warm_start directly.
+        scale = torch.exp(scale) + self.eps
+
+        return bloc, bscale, loc, scale
+
+    def _log_det(self, scale, bscale):
+        return (torch.log(scale) - torch.log(bscale)).sum(dim=1)
+
+    def _transform(self, x, log_det=False, **kwargs):
+        bloc, bscale, loc, scale = self._activation(x, update=self.training)
+        u = scale * ((x - bloc) / bscale) + loc
+        
+        if log_det:
+            log_det = self._log_det(scale, bscale)
+            return u, log_det
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        bloc, bscale, loc, scale = self._activation(update=False)
+        x = (u - loc) / scale * bscale + bloc
+        
+        if log_det:
+            log_det = -self._log_det(scale, bscale)
+            return x, log_det
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.modules.LeakyReLU"><code class="flex name class">
+<span>class <span class="ident">LeakyReLU</span></span>
+<span>(</span><span>negative_slope=0.01, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>LeakyReLU Flow.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>negative_slope</code></strong> :&ensp;<code>float</code></dt>
+<dd>slope used for those x &lt; 0,</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class LeakyReLU(Flow):
+    &#34;&#34;&#34;LeakyReLU Flow.&#34;&#34;&#34;
+
+    def __init__(self, negative_slope=0.01, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            negative_slope (float): slope used for those x &lt; 0,
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        self.negative_slope = negative_slope
+
+    def _log_det(self, x):
+        return torch.where(
+            x &gt;= 0, 
+            torch.zeros_like(x), 
+            torch.ones_like(x) * np.log(self.negative_slope)
+        )
+
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = torch.where(x &gt;= 0, x, x * self.negative_slope)
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = torch.where(u &gt;= 0, u, u / self.negative_slope)
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.modules.LogSigmoid"><code class="flex name class">
+<span>class <span class="ident">LogSigmoid</span></span>
+<span>(</span><span>alpha=1.0, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>LogSigmoid Flow, defined for numerical stability.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>alpha</code></strong> :&ensp;<code>float</code></dt>
+<dd>alpha parameter used by the <code><a title="flow.modules.Sigmoid" href="#flow.modules.Sigmoid">Sigmoid</a></code>.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class LogSigmoid(Flow):
+    &#34;&#34;&#34;LogSigmoid Flow, defined for numerical stability.&#34;&#34;&#34;
+
+    def __init__(self, alpha=1., **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            alpha (float): alpha parameter used by the `Sigmoid`.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        self.alpha = alpha
+
+    def _log_det(self, x):
+        &#34;&#34;&#34;Return log|det J_T|, where T: x -&gt; u.&#34;&#34;&#34;
+
+        return logsigmoid(-self.alpha * x) + np.log(self.alpha)
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = logsigmoid(x, alpha=self.alpha)
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = -softplus_inv(-u) / self.alpha
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.modules.Sigmoid"><code class="flex name class">
+<span>class <span class="ident">Sigmoid</span></span>
+<span>(</span><span>alpha=1.0, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Sigmoid Flow.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>alpha</code></strong> :&ensp;<code>float</code></dt>
+<dd>alpha parameter for the sigmoid function:
+<span><span class="MathJax_Preview">s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}</span><script type="math/tex">s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}</script></span>.
+Must be bigger than 0.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Sigmoid(Flow):
+    &#34;&#34;&#34;Sigmoid Flow.&#34;&#34;&#34;
+
+    def __init__(self, alpha=1., **kwargs):
+        r&#34;&#34;&#34;
+        Args:
+            alpha (float): alpha parameter for the sigmoid function: 
+                \(s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}\).
+                Must be bigger than 0.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        self.alpha = alpha
+
+    def _log_det(self, x):
+        &#34;&#34;&#34;Return log|det J_T|, where T: x -&gt; u.&#34;&#34;&#34;
+
+        return (
+            np.log(self.alpha) + 
+            2 * logsigmoid(x, alpha=alpha) +
+            -self.alpha * x
+        ).sum(dim=1)
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = torch.sigmoid(self.alpha * x)
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = -torch.log(1 / self.alpha / u - 1)
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.modules.Softplus"><code class="flex name class">
+<span>class <span class="ident">Softplus</span></span>
+<span>(</span><span>threshold=20.0, eps=1e-06, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Softplus Flow.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>threshold</code></strong> :&ensp;<code>float</code></dt>
+<dd>values above this revert to a linear function.
+Default: 20.</dd>
+<dt><strong><code>eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>lower-bound to the softplus output.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Softplus(Flow):
+    &#34;&#34;&#34;Softplus Flow.&#34;&#34;&#34;
+
+    def __init__(self, threshold=20., eps=1e-6, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            threshold (float): values above this revert to a linear function. 
+                Default: 20.
+            eps (float): lower-bound to the softplus output.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        assert threshold &gt; 0 and eps &gt; 0
+        self.threshold = threshold
+        self.eps = eps
+
+    def _log_det(self, x):
+        return logsigmoid(x).sum(dim=1)
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = softplus(x, threshold=self.threshold, eps=self.eps)
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = softplus_inv(u, threshold=self.threshold, eps=self.eps)
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x </code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="flow" href="index.html">flow</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="flow.modules.Affine" href="#flow.modules.Affine">Affine</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.modules.BatchNorm" href="#flow.modules.BatchNorm">BatchNorm</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.modules.LeakyReLU" href="#flow.modules.LeakyReLU">LeakyReLU</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.modules.LogSigmoid" href="#flow.modules.LogSigmoid">LogSigmoid</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.modules.Sigmoid" href="#flow.modules.Sigmoid">Sigmoid</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.modules.Softplus" href="#flow.modules.Softplus">Softplus</a></code></h4>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.8.1</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>

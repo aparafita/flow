@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.8.1" />
+<title>flow.transformer API documentation</title>
+<meta name="description" content="Implementations for Flow-transformers …" />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script async src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS_CHTML'></script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>flow.transformer</code></h1>
+</header>
+<section id="section-intro">
+<p>Implementations for Flow-transformers.</p>
+<p>Of particular interest are:</p>
+<ul>
+<li><code><a title="flow.transformer.Affine" href="#flow.transformer.Affine">Affine</a></code>: affine transformation.</li>
+<li><code><a title="flow.transformer.DSF" href="#flow.transformer.DSF">DSF</a></code>: Deep Sigmoidal Flow.</li>
+</ul>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+Implementations for Flow-transformers.
+
+Of particular interest are:
+
+* `Affine`: affine transformation.
+* `DSF`: Deep Sigmoidal Flow.
+&#34;&#34;&#34;
+
+from functools import partial
+
+import torch
+from torch import nn, optim
+import torch.nn.functional as F
+
+from .flow import Transformer
+from .modules import LogSigmoid, LeakyReLU, softplus_inv
+from .utils import *
+
+
+class Affine(Transformer):
+    &#34;&#34;&#34;Affine Transformer.
+    &#34;&#34;&#34;
+
+    def __init__(self, eps=1e-6, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            eps (float): lower-bound for strictly-positive h parameters.
+        &#34;&#34;&#34;
+
+        _h_dim = 2
+        h_dim = kwargs.pop(&#39;h_dim&#39;, _h_dim)
+        assert h_dim == _h_dim, f&#39;Received h_dim={h_dim} but expected {_h_dim}&#39;
+
+        super().__init__(h_dim=h_dim, **kwargs)
+
+        self.eps = eps
+
+    def _log_det(self, scale):
+        return torch.log(scale).sum(dim=1)
+
+    def _activation(self, h):
+        &#34;&#34;&#34;Returns (loc, scale) parameters.&#34;&#34;&#34;
+        assert not h.size(1) % self.h_dim
+
+        loc, scale = h[:, ::2], h[:, 1::2]
+        scale = F.softplus(scale) + self.eps
+
+        return loc, scale
+
+    def _transform(self, x, *h, log_det=False, **kwargs):
+        loc, scale = h
+        u = x * scale + loc
+
+        if log_det:
+            return u, self._log_det(scale)
+        else:
+            return u
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        loc, scale = h
+        x = (u - loc) / scale
+
+        if log_det:
+            return x, -self._log_det(scale)
+        else:
+            return x
+
+
+class IncreasingMonotonicTransformer(Transformer):
+    &#34;&#34;&#34;Abstract Transformer that inverts using Bijection Search, 
+        specific for increasing monotonic transformers.
+
+    Note that using this method, inversion will not be differentiable.
+    Uses `flow.utils.monotonic_increasing_bijective_search`.
+    &#34;&#34;&#34;
+
+    def __init__(self, inv_eps=1e-3, inv_steps=1000, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            inv_eps (float): minimum difference between f(u) and x
+                allowed to stop the inversion.
+            inv_steps (int): maximum number of iterations 
+                before halting execution. If 0 (default) no maximum defined.
+            inv_alpha (float): alpha parameter for the inversion method.
+        &#34;&#34;&#34;
+
+        super().__init__(**kwargs)
+
+        self.inv_eps = inv_eps
+        self.inv_steps = inv_steps
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        x = monotonic_increasing_bijective_search(
+            # use _transform, but without log_det
+            self._transform, u, *h, **kwargs,
+            eps=self.inv_eps, max_steps=self.inv_steps
+        )
+
+        if log_det:
+            _, log_det = self._transform(u, *h, log_det=True, **kwargs)
+            return x, -log_det
+        else:
+            return x
+
+
+class NewtonInvTransformer(Transformer):
+    &#34;&#34;&#34;Abstract Transformer that inverts using the Newton-Raphson method.
+
+    Note that using this method, inversion will not be differentiable.
+    &#34;&#34;&#34;
+
+    def __init__(self, inv_eps=1e-3, inv_steps=1000, inv_init=None, lr=1., **kwargs):
+        &#34;&#34;&#34;        
+        Args:
+            inv_eps (float): minimum difference between f(u) and x
+                allowed to stop the inversion.
+            inv_steps (int): maximum number of iterations 
+                before halting execution. If 0 (default) no maximum defined.
+            inv_init (function): function used to inicialize u.
+                If None, u = x.
+        &#34;&#34;&#34;
+
+        super().__init__(reversed=reversed, **kwargs)
+
+        self.inv_eps = inv_eps
+        self.inv_steps = inv_steps
+        self.inv_init = inv_init
+        self.lr = lr
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        # Inversion by Newton-Raphson: f(x) - u = 0
+        if self.inv_init is not None:
+            x = self.inv_init(u, *h, **kwargs)
+        else:
+            x = monotonic_increasing_bijective_search(
+                self._transform,
+                u, *h, **kwargs,
+                eps=self.inv_eps, max_steps=10
+            )
+
+        step = 1
+        with torch.no_grad():
+            while True:
+                f_x, log_det_i = self._transform(
+                    x, *h, log_det=True, **kwargs
+                )
+
+                if (f_x - u).abs().max() &lt; self.inv_eps or (
+                    self.inv_steps and step &gt;= self.inv_steps
+                ):
+                    break
+                else:
+                    x = x - self.lr * (f_x - u) / \
+                        torch.exp(log_det_i.unsqueeze(1))
+                    step += 1
+
+            if log_det:
+                # Execute transform again to recover log_det
+                _, log_det = self._transform(
+                    x, *h, log_det=True, **kwargs
+                )
+                return x, -log_det
+            else:
+                return x
+
+
+class AdamInvTransformer(Transformer):
+    &#34;&#34;&#34;Abstract Transformer that inverts using the Adam optimizer.
+
+    Note that using this method, inversion will not be differentiable.
+
+    **CAUTION**: for any inheriting Transformers, 
+    if you need to pass tensors as **kwargs to _invert, don&#39;t pass them inside
+    lists or any another collection, pass them directly.
+    Otherwise, _invert would run through their graph multiple times 
+    and result in an Exception. See _invert for more details.
+    &#34;&#34;&#34;
+
+    def __init__(
+        self, 
+        inv_lr=1e-1, inv_eps=1e-3, inv_steps=1000, 
+        inv_init=None, **kwargs
+    ):
+        &#34;&#34;&#34;
+        Args:
+            inv_lr (float): learning rate for the Adam optimizer.
+                Quite high by default (1e-1) in order to make sampling fast.
+                For more precision, use inv_lr=1e-3 and inv_steps &gt;= 10000
+            inv_eps (float): minimum difference between f(u) and x squared
+                allowed to stop the inversion.
+            inv_steps (int): maximum number of iterations 
+                before halting execution. If 0 (default) no maximum defined.
+            inv_init (function): function used to inicialize u.
+                If None, u = torch.randn_like(x).
+        &#34;&#34;&#34;
+
+        super().__init__(reversed=reversed, **kwargs)
+
+        self.inv_lr = inv_lr
+        self.inv_eps = inv_eps
+        self.inv_steps = inv_steps
+        self.inv_init = inv_init
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        # _invert should be called inside a torch.no_grad(), 
+        # since this operation will not be invertible
+        with torch.no_grad():
+            # Avoid running twice through the graph
+            u = u.clone()
+            h = tuple(hi.clone() for hi in h)
+
+            for k, v in kwargs.items():
+                if isinstance(v, torch.Tensor):
+                    kwargs[k] = v.clone()
+
+            if self.inv_init is None:
+                x = nn.Parameter(torch.randn_like(u))
+            else:
+                x = nn.Parameter(self.inv_init(u, *h, **kwargs))
+            
+            # Howewer, we do need to enable gradients here to use the optimizer.
+            with torch.enable_grad(): 
+                optimizer = optim.Adam([x], lr=self.inv_lr)
+                
+                for _ in range(self.inv_steps):
+                    loss = (
+                        (u - self._transform(x, *h, **kwargs)) ** 2
+                    ).mean()
+                    
+                    if loss.item() &lt; self.inv_eps:
+                        break
+                    
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                x = x.data # get the data from the parameter
+                
+            if log_det:
+                _, log_det = self._transform(
+                    x, *h, **kwargs, log_det=True
+                )
+                log_det = -log_det # we&#39;re inverting
+                
+                return x, log_det
+            else:
+                return x
+
+
+class NonAffine(AdamInvTransformer):
+    &#39;&#39;&#39;Non-affine transformer.
+
+    https://arxiv.org/abs/1912.02762
+    &#39;&#39;&#39;
+
+    def __init__(self, k=16, nl=LeakyReLU, eps=1e-6, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            k (int): number of components of the conic combination.
+            nl (class): non-linearity Flow to use in each component.
+                Defaults to `flow.modules.LeakyReLU`.
+            eps (float): lower-bound to strictly-positive h parameters.
+        &#34;&#34;&#34;
+
+        _h_dim = 3 * k + 1
+        h_dim = kwargs.pop(&#39;h_dim&#39;, _h_dim)
+        assert h_dim == _h_dim, f&#39;Received h_dim={h_dim} but expected {_h_dim}&#39;
+
+        super().__init__(h_dim=h_dim, **kwargs)
+
+        self.k = k
+        self.nl = nl()
+        self.eps = eps
+
+    def _activation(self, h):
+        &#34;&#34;&#34;Returns (weight, loc, scale, bias) parameters.&#34;&#34;&#34;
+        assert not h.size(1) % self.h_dim
+
+        h = h.view(h.size(0), -1, self.h_dim)
+        weight, loc, scale = h[..., :-1:3], h[..., 1:-1:3], h[..., 2:-1:3]
+        bias = h[..., -1]
+
+        scale = F.softplus(scale) + self.eps
+        weight = F.softplus(weight) + self.eps
+
+        return weight, loc, scale, bias
+
+    def _transform(self, u, *h, log_det=False, **kwargs):
+        weight, loc, scale, bias = h
+        z = u.unsqueeze(2) * scale + loc
+        
+        nl_res = self.nl(z, log_det=log_det)
+        if log_det:
+            nl_z, log_det_i = nl_res
+
+            log_det_i = log_sum_exp_trick(
+                torch.log(weight) + log_det_i + torch.log(scale)
+            ).sum(dim=1)
+        else:
+            nl_z = nl_res
+
+        x = (nl_z * weight).sum(dim=2) + bias
+
+        if log_det:
+            return x, log_det_i
+        else:
+            return x
+
+
+class DSF(AdamInvTransformer):
+    &#34;&#34;&#34;Deep Sigmoidal Flow.
+
+    https://arxiv.org/abs/1804.00779
+    &#34;&#34;&#34;
+
+    def __init__(self, k=16, eps=1e-6, alpha=1., **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            - k (int): number of components of the conic combination.
+            - eps (float): lower-bound to strictly-positive h parameters.
+            - alpha (float): alpha parameter for the sigmoid. Defaults to 1.
+        &#34;&#34;&#34;
+
+        _h_dim = 3 * k
+        h_dim = kwargs.pop(&#39;h_dim&#39;, _h_dim)
+        assert h_dim == _h_dim, f&#39;Received h_dim={h_dim} but expected {_h_dim}&#39;
+
+        super().__init__(h_dim=h_dim, **kwargs)
+
+        self.k = k
+        self.eps = eps
+        self.ls = LogSigmoid(dim=self.dim, alpha=alpha, eps=eps)
+
+    def _activation(self, h):
+        &#34;&#34;&#34;Returns (loc, scale, w, loc_post, scale_post) parameters.&#34;&#34;&#34;
+        assert not h.size(1) % self.h_dim, (h.size(1), self.h_dim)
+
+        h = h.view(h.size(0), -1, self.h_dim)
+
+        loc, scale, w = h[..., ::3], h[..., 1::3], h[..., 2::3]
+        
+        scale = F.softplus(scale) + self.eps
+        log_w = F.log_softmax(w, dim=2)
+        
+        return loc, scale, log_w
+
+    def _transform(self, x, *h, log_det=False, **kwargs):
+        # TODO: Avoid computing log_det if not requested
+        loc, scale, log_w = h
+
+        z, log_det_z = self.ls(scale * x.unsqueeze(2) + loc, log_det=True)
+        z2 = log_sum_exp_trick(log_w + z)
+        u, log_det_u = self.ls(z2, invert=True, log_det=True)
+
+        if log_det:
+            log_det = (
+                log_det_u +
+                -z2 +
+                log_sum_exp_trick(log_w + z + log_det_z + torch.log(scale))
+            ).sum(dim=1)
+
+            return u, log_det
+        else:
+            return u</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="flow.transformer.AdamInvTransformer"><code class="flex name class">
+<span>class <span class="ident">AdamInvTransformer</span></span>
+<span>(</span><span>inv_lr=0.1, inv_eps=0.001, inv_steps=1000, inv_init=None, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Abstract Transformer that inverts using the Adam optimizer.</p>
+<p>Note that using this method, inversion will not be differentiable.</p>
+<p><strong>CAUTION</strong>: for any inheriting Transformers,
+if you need to pass tensors as **kwargs to _invert, don't pass them inside
+lists or any another collection, pass them directly.
+Otherwise, _invert would run through their graph multiple times
+and result in an Exception. See _invert for more details.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>inv_lr</code></strong> :&ensp;<code>float</code></dt>
+<dd>learning rate for the Adam optimizer.
+Quite high by default (1e-1) in order to make sampling fast.
+For more precision, use inv_lr=1e-3 and inv_steps &gt;= 10000</dd>
+<dt><strong><code>inv_eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>minimum difference between f(u) and x squared
+allowed to stop the inversion.</dd>
+<dt><strong><code>inv_steps</code></strong> :&ensp;<code>int</code></dt>
+<dd>maximum number of iterations
+before halting execution. If 0 (default) no maximum defined.</dd>
+<dt><strong><code>inv_init</code></strong> :&ensp;<code>function</code></dt>
+<dd>function used to inicialize u.
+If None, u = torch.randn_like(x).</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class AdamInvTransformer(Transformer):
+    &#34;&#34;&#34;Abstract Transformer that inverts using the Adam optimizer.
+
+    Note that using this method, inversion will not be differentiable.
+
+    **CAUTION**: for any inheriting Transformers, 
+    if you need to pass tensors as **kwargs to _invert, don&#39;t pass them inside
+    lists or any another collection, pass them directly.
+    Otherwise, _invert would run through their graph multiple times 
+    and result in an Exception. See _invert for more details.
+    &#34;&#34;&#34;
+
+    def __init__(
+        self, 
+        inv_lr=1e-1, inv_eps=1e-3, inv_steps=1000, 
+        inv_init=None, **kwargs
+    ):
+        &#34;&#34;&#34;
+        Args:
+            inv_lr (float): learning rate for the Adam optimizer.
+                Quite high by default (1e-1) in order to make sampling fast.
+                For more precision, use inv_lr=1e-3 and inv_steps &gt;= 10000
+            inv_eps (float): minimum difference between f(u) and x squared
+                allowed to stop the inversion.
+            inv_steps (int): maximum number of iterations 
+                before halting execution. If 0 (default) no maximum defined.
+            inv_init (function): function used to inicialize u.
+                If None, u = torch.randn_like(x).
+        &#34;&#34;&#34;
+
+        super().__init__(reversed=reversed, **kwargs)
+
+        self.inv_lr = inv_lr
+        self.inv_eps = inv_eps
+        self.inv_steps = inv_steps
+        self.inv_init = inv_init
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        # _invert should be called inside a torch.no_grad(), 
+        # since this operation will not be invertible
+        with torch.no_grad():
+            # Avoid running twice through the graph
+            u = u.clone()
+            h = tuple(hi.clone() for hi in h)
+
+            for k, v in kwargs.items():
+                if isinstance(v, torch.Tensor):
+                    kwargs[k] = v.clone()
+
+            if self.inv_init is None:
+                x = nn.Parameter(torch.randn_like(u))
+            else:
+                x = nn.Parameter(self.inv_init(u, *h, **kwargs))
+            
+            # Howewer, we do need to enable gradients here to use the optimizer.
+            with torch.enable_grad(): 
+                optimizer = optim.Adam([x], lr=self.inv_lr)
+                
+                for _ in range(self.inv_steps):
+                    loss = (
+                        (u - self._transform(x, *h, **kwargs)) ** 2
+                    ).mean()
+                    
+                    if loss.item() &lt; self.inv_eps:
+                        break
+                    
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                x = x.data # get the data from the parameter
+                
+            if log_det:
+                _, log_det = self._transform(
+                    x, *h, **kwargs, log_det=True
+                )
+                log_det = -log_det # we&#39;re inverting
+                
+                return x, log_det
+            else:
+                return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="flow.transformer.DSF" href="#flow.transformer.DSF">DSF</a></li>
+<li><a title="flow.transformer.NonAffine" href="#flow.transformer.NonAffine">NonAffine</a></li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Transformer.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Transformer.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Transformer.forward" href="flow.html#flow.flow.Transformer.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Transformer.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Transformer.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Transformer.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Transformer.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Transformer.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.transformer.Affine"><code class="flex name class">
+<span>class <span class="ident">Affine</span></span>
+<span>(</span><span>eps=1e-06, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Affine Transformer.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>lower-bound for strictly-positive h parameters.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Affine(Transformer):
+    &#34;&#34;&#34;Affine Transformer.
+    &#34;&#34;&#34;
+
+    def __init__(self, eps=1e-6, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            eps (float): lower-bound for strictly-positive h parameters.
+        &#34;&#34;&#34;
+
+        _h_dim = 2
+        h_dim = kwargs.pop(&#39;h_dim&#39;, _h_dim)
+        assert h_dim == _h_dim, f&#39;Received h_dim={h_dim} but expected {_h_dim}&#39;
+
+        super().__init__(h_dim=h_dim, **kwargs)
+
+        self.eps = eps
+
+    def _log_det(self, scale):
+        return torch.log(scale).sum(dim=1)
+
+    def _activation(self, h):
+        &#34;&#34;&#34;Returns (loc, scale) parameters.&#34;&#34;&#34;
+        assert not h.size(1) % self.h_dim
+
+        loc, scale = h[:, ::2], h[:, 1::2]
+        scale = F.softplus(scale) + self.eps
+
+        return loc, scale
+
+    def _transform(self, x, *h, log_det=False, **kwargs):
+        loc, scale = h
+        u = x * scale + loc
+
+        if log_det:
+            return u, self._log_det(scale)
+        else:
+            return u
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        loc, scale = h
+        x = (u - loc) / scale
+
+        if log_det:
+            return x, -self._log_det(scale)
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Transformer.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Transformer.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Transformer.forward" href="flow.html#flow.flow.Transformer.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Transformer.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Transformer.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Transformer.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Transformer.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Transformer.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.transformer.DSF"><code class="flex name class">
+<span>class <span class="ident">DSF</span></span>
+<span>(</span><span>k=16, eps=1e-06, alpha=1.0, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Deep Sigmoidal Flow.</p>
+<p><a href="https://arxiv.org/abs/1804.00779">https://arxiv.org/abs/1804.00779</a></p>
+<h2 id="args">Args</h2>
+<ul>
+<li>k (int): number of components of the conic combination.</li>
+<li>eps (float): lower-bound to strictly-positive h parameters.</li>
+<li>alpha (float): alpha parameter for the sigmoid. Defaults to 1.</li>
+</ul></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class DSF(AdamInvTransformer):
+    &#34;&#34;&#34;Deep Sigmoidal Flow.
+
+    https://arxiv.org/abs/1804.00779
+    &#34;&#34;&#34;
+
+    def __init__(self, k=16, eps=1e-6, alpha=1., **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            - k (int): number of components of the conic combination.
+            - eps (float): lower-bound to strictly-positive h parameters.
+            - alpha (float): alpha parameter for the sigmoid. Defaults to 1.
+        &#34;&#34;&#34;
+
+        _h_dim = 3 * k
+        h_dim = kwargs.pop(&#39;h_dim&#39;, _h_dim)
+        assert h_dim == _h_dim, f&#39;Received h_dim={h_dim} but expected {_h_dim}&#39;
+
+        super().__init__(h_dim=h_dim, **kwargs)
+
+        self.k = k
+        self.eps = eps
+        self.ls = LogSigmoid(dim=self.dim, alpha=alpha, eps=eps)
+
+    def _activation(self, h):
+        &#34;&#34;&#34;Returns (loc, scale, w, loc_post, scale_post) parameters.&#34;&#34;&#34;
+        assert not h.size(1) % self.h_dim, (h.size(1), self.h_dim)
+
+        h = h.view(h.size(0), -1, self.h_dim)
+
+        loc, scale, w = h[..., ::3], h[..., 1::3], h[..., 2::3]
+        
+        scale = F.softplus(scale) + self.eps
+        log_w = F.log_softmax(w, dim=2)
+        
+        return loc, scale, log_w
+
+    def _transform(self, x, *h, log_det=False, **kwargs):
+        # TODO: Avoid computing log_det if not requested
+        loc, scale, log_w = h
+
+        z, log_det_z = self.ls(scale * x.unsqueeze(2) + loc, log_det=True)
+        z2 = log_sum_exp_trick(log_w + z)
+        u, log_det_u = self.ls(z2, invert=True, log_det=True)
+
+        if log_det:
+            log_det = (
+                log_det_u +
+                -z2 +
+                log_sum_exp_trick(log_w + z + log_det_z + torch.log(scale))
+            ).sum(dim=1)
+
+            return u, log_det
+        else:
+            return u</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.transformer.AdamInvTransformer" href="#flow.transformer.AdamInvTransformer">AdamInvTransformer</a></li>
+<li><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.transformer.AdamInvTransformer" href="#flow.transformer.AdamInvTransformer">AdamInvTransformer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.transformer.AdamInvTransformer.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.forward" href="flow.html#flow.flow.Transformer.forward">forward</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.transformer.IncreasingMonotonicTransformer"><code class="flex name class">
+<span>class <span class="ident">IncreasingMonotonicTransformer</span></span>
+<span>(</span><span>inv_eps=0.001, inv_steps=1000, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Abstract Transformer that inverts using Bijection Search,
+specific for increasing monotonic transformers.</p>
+<p>Note that using this method, inversion will not be differentiable.
+Uses <code><a title="flow.utils.monotonic_increasing_bijective_search" href="utils.html#flow.utils.monotonic_increasing_bijective_search">monotonic_increasing_bijective_search()</a></code>.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>inv_eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>minimum difference between f(u) and x
+allowed to stop the inversion.</dd>
+<dt><strong><code>inv_steps</code></strong> :&ensp;<code>int</code></dt>
+<dd>maximum number of iterations
+before halting execution. If 0 (default) no maximum defined.</dd>
+<dt><strong><code>inv_alpha</code></strong> :&ensp;<code>float</code></dt>
+<dd>alpha parameter for the inversion method.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class IncreasingMonotonicTransformer(Transformer):
+    &#34;&#34;&#34;Abstract Transformer that inverts using Bijection Search, 
+        specific for increasing monotonic transformers.
+
+    Note that using this method, inversion will not be differentiable.
+    Uses `flow.utils.monotonic_increasing_bijective_search`.
+    &#34;&#34;&#34;
+
+    def __init__(self, inv_eps=1e-3, inv_steps=1000, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            inv_eps (float): minimum difference between f(u) and x
+                allowed to stop the inversion.
+            inv_steps (int): maximum number of iterations 
+                before halting execution. If 0 (default) no maximum defined.
+            inv_alpha (float): alpha parameter for the inversion method.
+        &#34;&#34;&#34;
+
+        super().__init__(**kwargs)
+
+        self.inv_eps = inv_eps
+        self.inv_steps = inv_steps
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        x = monotonic_increasing_bijective_search(
+            # use _transform, but without log_det
+            self._transform, u, *h, **kwargs,
+            eps=self.inv_eps, max_steps=self.inv_steps
+        )
+
+        if log_det:
+            _, log_det = self._transform(u, *h, log_det=True, **kwargs)
+            return x, -log_det
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Transformer.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Transformer.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Transformer.forward" href="flow.html#flow.flow.Transformer.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Transformer.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Transformer.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Transformer.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Transformer.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Transformer.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.transformer.NewtonInvTransformer"><code class="flex name class">
+<span>class <span class="ident">NewtonInvTransformer</span></span>
+<span>(</span><span>inv_eps=0.001, inv_steps=1000, inv_init=None, lr=1.0, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Abstract Transformer that inverts using the Newton-Raphson method.</p>
+<p>Note that using this method, inversion will not be differentiable.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>inv_eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>minimum difference between f(u) and x
+allowed to stop the inversion.</dd>
+<dt><strong><code>inv_steps</code></strong> :&ensp;<code>int</code></dt>
+<dd>maximum number of iterations
+before halting execution. If 0 (default) no maximum defined.</dd>
+<dt><strong><code>inv_init</code></strong> :&ensp;<code>function</code></dt>
+<dd>function used to inicialize u.
+If None, u = x.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NewtonInvTransformer(Transformer):
+    &#34;&#34;&#34;Abstract Transformer that inverts using the Newton-Raphson method.
+
+    Note that using this method, inversion will not be differentiable.
+    &#34;&#34;&#34;
+
+    def __init__(self, inv_eps=1e-3, inv_steps=1000, inv_init=None, lr=1., **kwargs):
+        &#34;&#34;&#34;        
+        Args:
+            inv_eps (float): minimum difference between f(u) and x
+                allowed to stop the inversion.
+            inv_steps (int): maximum number of iterations 
+                before halting execution. If 0 (default) no maximum defined.
+            inv_init (function): function used to inicialize u.
+                If None, u = x.
+        &#34;&#34;&#34;
+
+        super().__init__(reversed=reversed, **kwargs)
+
+        self.inv_eps = inv_eps
+        self.inv_steps = inv_steps
+        self.inv_init = inv_init
+        self.lr = lr
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        # Inversion by Newton-Raphson: f(x) - u = 0
+        if self.inv_init is not None:
+            x = self.inv_init(u, *h, **kwargs)
+        else:
+            x = monotonic_increasing_bijective_search(
+                self._transform,
+                u, *h, **kwargs,
+                eps=self.inv_eps, max_steps=10
+            )
+
+        step = 1
+        with torch.no_grad():
+            while True:
+                f_x, log_det_i = self._transform(
+                    x, *h, log_det=True, **kwargs
+                )
+
+                if (f_x - u).abs().max() &lt; self.inv_eps or (
+                    self.inv_steps and step &gt;= self.inv_steps
+                ):
+                    break
+                else:
+                    x = x - self.lr * (f_x - u) / \
+                        torch.exp(log_det_i.unsqueeze(1))
+                    step += 1
+
+            if log_det:
+                # Execute transform again to recover log_det
+                _, log_det = self._transform(
+                    x, *h, log_det=True, **kwargs
+                )
+                return x, -log_det
+            else:
+                return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Transformer.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Transformer.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Transformer.forward" href="flow.html#flow.flow.Transformer.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Transformer.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Transformer.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Transformer.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Transformer.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Transformer.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.transformer.NonAffine"><code class="flex name class">
+<span>class <span class="ident">NonAffine</span></span>
+<span>(</span><span>k=16, nl=flow.modules.LeakyReLU, eps=1e-06, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Non-affine transformer.</p>
+<p><a href="https://arxiv.org/abs/1912.02762">https://arxiv.org/abs/1912.02762</a></p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>k</code></strong> :&ensp;<code>int</code></dt>
+<dd>number of components of the conic combination.</dd>
+<dt><strong><code>nl</code></strong> :&ensp;<code>class</code></dt>
+<dd>non-linearity Flow to use in each component.
+Defaults to <code><a title="flow.modules.LeakyReLU" href="modules.html#flow.modules.LeakyReLU">LeakyReLU</a></code>.</dd>
+<dt><strong><code>eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>lower-bound to strictly-positive h parameters.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class NonAffine(AdamInvTransformer):
+    &#39;&#39;&#39;Non-affine transformer.
+
+    https://arxiv.org/abs/1912.02762
+    &#39;&#39;&#39;
+
+    def __init__(self, k=16, nl=LeakyReLU, eps=1e-6, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            k (int): number of components of the conic combination.
+            nl (class): non-linearity Flow to use in each component.
+                Defaults to `flow.modules.LeakyReLU`.
+            eps (float): lower-bound to strictly-positive h parameters.
+        &#34;&#34;&#34;
+
+        _h_dim = 3 * k + 1
+        h_dim = kwargs.pop(&#39;h_dim&#39;, _h_dim)
+        assert h_dim == _h_dim, f&#39;Received h_dim={h_dim} but expected {_h_dim}&#39;
+
+        super().__init__(h_dim=h_dim, **kwargs)
+
+        self.k = k
+        self.nl = nl()
+        self.eps = eps
+
+    def _activation(self, h):
+        &#34;&#34;&#34;Returns (weight, loc, scale, bias) parameters.&#34;&#34;&#34;
+        assert not h.size(1) % self.h_dim
+
+        h = h.view(h.size(0), -1, self.h_dim)
+        weight, loc, scale = h[..., :-1:3], h[..., 1:-1:3], h[..., 2:-1:3]
+        bias = h[..., -1]
+
+        scale = F.softplus(scale) + self.eps
+        weight = F.softplus(weight) + self.eps
+
+        return weight, loc, scale, bias
+
+    def _transform(self, u, *h, log_det=False, **kwargs):
+        weight, loc, scale, bias = h
+        z = u.unsqueeze(2) * scale + loc
+        
+        nl_res = self.nl(z, log_det=log_det)
+        if log_det:
+            nl_z, log_det_i = nl_res
+
+            log_det_i = log_sum_exp_trick(
+                torch.log(weight) + log_det_i + torch.log(scale)
+            ).sum(dim=1)
+        else:
+            nl_z = nl_res
+
+        x = (nl_z * weight).sum(dim=2) + bias
+
+        if log_det:
+            return x, log_det_i
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.transformer.AdamInvTransformer" href="#flow.transformer.AdamInvTransformer">AdamInvTransformer</a></li>
+<li><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.transformer.AdamInvTransformer" href="#flow.transformer.AdamInvTransformer">AdamInvTransformer</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.transformer.AdamInvTransformer.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.forward" href="flow.html#flow.flow.Transformer.forward">forward</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.transformer.AdamInvTransformer.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="flow" href="index.html">flow</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="flow.transformer.AdamInvTransformer" href="#flow.transformer.AdamInvTransformer">AdamInvTransformer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.transformer.Affine" href="#flow.transformer.Affine">Affine</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.transformer.DSF" href="#flow.transformer.DSF">DSF</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.transformer.IncreasingMonotonicTransformer" href="#flow.transformer.IncreasingMonotonicTransformer">IncreasingMonotonicTransformer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.transformer.NewtonInvTransformer" href="#flow.transformer.NewtonInvTransformer">NewtonInvTransformer</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.transformer.NonAffine" href="#flow.transformer.NonAffine">NonAffine</a></code></h4>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.8.1</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>

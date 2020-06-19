@@ -1,0 +1,1726 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.8.1" />
+<title>flow.flow API documentation</title>
+<meta name="description" content="Abstract classes for the implementation of Flows …" />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script async src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS_CHTML'></script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>flow.flow</code></h1>
+</header>
+<section id="section-intro">
+<p>Abstract classes for the implementation of Flows.</p>
+<ul>
+<li><code><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></code>: base abstract class for any flow.</li>
+<li><code><a title="flow.flow.Sequential" href="#flow.flow.Sequential">Sequential</a></code>: flow as a composition of n subflows.</li>
+<li><code><a title="flow.flow.Conditioner" href="#flow.flow.Conditioner">Conditioner</a></code>: abstract class for any flow defined
+as the combination of a transformer and a conditioner.</li>
+<li><code><a title="flow.flow.Transformer" href="#flow.flow.Transformer">Transformer</a></code>: abstract class for a transformer.</li>
+</ul>
+<p>Also function:</p>
+<ul>
+<li><code><a title="flow.flow.inv_flow" href="#flow.flow.inv_flow">inv_flow()</a></code>: generates an inheriting class from a Flow
+that swaps its _transform and _invert methods.</li>
+</ul>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+Abstract classes for the implementation of Flows.
+
+* `Flow`: base abstract class for any flow.
+* `Sequential`: flow as a composition of n subflows.
+* `Conditioner`: abstract class for any flow defined 
+    as the combination of a transformer and a conditioner.
+* `Transformer`: abstract class for a transformer.
+
+Also function:
+
+* `inv_flow`: generates an inheriting class from a Flow 
+    that swaps its _transform and _invert methods.
+&#34;&#34;&#34;
+
+import torch
+from torch import nn
+
+from .prior import Normal as NormalPrior
+
+
+class Flow(nn.Module):
+    r&#34;&#34;&#34;Base abstract class for any Flow. 
+
+    A Flow represents a diffeomorphic T such that U = T(X),
+    where X is the data distribution and U is the base distribution,
+    a standard Normal distribution by default.
+
+    Any class that inherits from Flow needs to implement:
+    ```python
+    def _transform(self, x, log_det=False, **kwargs): 
+        # Transforms x into u. Used for training.
+        ...
+
+    def _invert(self, u, log_det=False, **kwargs): 
+        # Transforms u into x. Used for sampling.
+        ...
+
+    def warm_start(self, x, **kwargs):
+        # Warm start operation for the flow, if necessary.
+        ...
+    ```
+
+    Both _transform and _invert may also return log|det J_T| if log_det is True.
+    Otherwise, they only return the transformed tensor.
+
+    Note that in training, using forward or backward KL divergence,
+    _transform or _invert should be differentiable w.r.t. the flow&#39;s parameters,
+    respectively. Otherwise, the flow would not learn.
+    &#34;&#34;&#34;
+
+    def __init__(self, dim=1, prior=None, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            dim (int): dimensionality of this flow. Defaults to 1.
+            prior (class): prior class for U (inheriting `flow.prior.Prior`).
+                Used for sampling and in the computation of nll.
+                If None, defaults to `flow.prior.Normal`.
+                If this flow is in a `Sequential`, its prior is ignored.
+        &#34;&#34;&#34;
+        super().__init__()
+
+        self.dim = dim
+
+        if prior is None:
+            prior = NormalPrior(dim=dim)
+        else:
+            assert prior.dim == dim
+        
+        self.prior = prior
+        self.device = torch.device(&#39;cpu&#39;)
+
+
+    def forward(self, t, invert=False, log_det=False, **kwargs):
+        r&#34;&#34;&#34;Call _transform (x -&gt; u) or _invert (u -&gt; x) on t.
+
+        Args:
+            t (torch.Tensor): tensor to transform.
+            invert (bool): whether to call _transform (True) 
+                or _invert (False) on t.
+            log_det (bool): whether to return \(\log |\det J_T|\)
+                of the current transformation T.
+
+        Returns:
+            t: transformed tensor, either u if invert=False
+                or x if invert=True.
+            log_det: only returned if log_det=True.
+                Tensor containing \(\log |\det J_T|\), 
+                where T is the applied transformation. 
+        &#34;&#34;&#34;
+
+        if not invert:
+            return self._transform(t, **kwargs, log_det=log_det)
+        else:
+            return self._invert(t, **kwargs, log_det=log_det)
+
+
+    # Override these methods
+    def _transform(self, x, log_det=False, **kwargs):
+        &#34;&#34;&#34;Transform x into u.&#34;&#34;&#34;
+        raise NotImplementedError()
+
+    def _invert(self, u, log_det=False, **kwargs):
+        &#34;&#34;&#34;Transform u into x.&#34;&#34;&#34;
+        raise NotImplementedError()
+
+    def warm_start(self, x, **kwargs):
+        &#34;&#34;&#34;Perform a warm_start operation to the flow (optional).
+
+        Args:
+            x (torch.Tensor): dataset sample to use in the warming up.
+
+        Returns:
+            self
+        &#34;&#34;&#34;
+        return self
+
+
+    # Utilities
+    def sample(self, n, **kwargs):
+        &#34;&#34;&#34;Generate n samples from X.&#34;&#34;&#34;
+        assert self.prior is not None
+        
+        u = self.prior.sample(n)
+        x = self(u, **kwargs, invert=True)
+
+        return x
+
+    def nll(self, x, **kwargs):
+        &#34;&#34;&#34;Compute the negative log-likelihood of samples x.
+
+        The result of this function can directly be used 
+        as the MLE training loss for a flow.
+        &#34;&#34;&#34;
+        assert self.prior is not None
+
+        u, log_det = self(x, **kwargs, log_det=True)
+
+        return self.prior.nll(u) - log_det
+
+    def reverse_kl(self, n, nll_x, **kwargs):
+        &#34;&#34;&#34;Compute the reverse KL divergence of n prior samples.
+
+        Used to train flows in reverse mode.
+        Useful to create samplers from a known density function.
+
+        Args:
+            n (int): number of samples.
+            nll_x (function): negative log-density function of x.
+                Also receives **kwargs.
+        &#34;&#34;&#34;
+        assert self.prior is not None
+
+        u = self.prior.sample(n)
+        loglk_u = -self.prior.nll(u)
+
+        x, log_det = self._invert(u, log_det=True, **kwargs)
+        loglk_x = -nll_x(x, **kwargs)
+
+        return loglk_u - log_det - loglk_x
+
+
+    # Device overrides
+    def _update_device(self, device):
+        &#34;&#34;&#34;Update saved device for this flow and all its subcomponents.&#34;&#34;&#34;
+        if self.prior is not None:
+            self.prior._update_device(device)
+
+        self.device = device
+
+    def to(self, device):
+        &#34;&#34;&#34;Override .to(device) so as to call _update_device(device).&#34;&#34;&#34;
+        self._update_device(device)
+
+        return super().to(device)
+
+    def cpu(self):
+        &#34;&#34;&#34;Override .cpu so as to call .to method.&#34;&#34;&#34;
+        return self.to(torch.device(&#39;cpu&#39;))
+
+    def cuda(self):
+        &#34;&#34;&#34;Override .cuda so as to call .to method.&#34;&#34;&#34;
+        return self.to(torch.device(&#39;cuda&#39;, index=0))
+
+
+def inv_flow(flow_cls, name=None):
+    &#34;&#34;&#34;Transform a Flow class so that _transform and _invert are swapped.
+    
+    Args:
+        flow_cls (class): `Flow` class to inherit from.
+        name (str): name to use for the new class. 
+            If None, defaults to &#39;Inv&#39; + flow_cls.__name__
+    &#34;&#34;&#34;
+    if name is None:
+        name = &#39;Inv&#39; + flow_cls.__name__
+
+    class InvFlow(flow_cls):
+
+        # Extend forward to swap _transform and _invert
+        def forward(self, t, invert=False, **kwargs):
+            return super().forward(t, invert=not invert, **kwargs)
+
+    InvFlow.__name__ = name
+    InvFlow.__doc__ = (
+        &#39;Inverse flow. Note that _transform and _invert &#39;
+        &#39;are swapped in this Flow.\n&#39;
+    ) + __doc__
+
+    return InvFlow
+
+
+class Sequential(Flow):
+    &#34;&#34;&#34;Flow defined by a sequence of flows.
+
+    Note that flows are specified in the order X -&gt; U.
+    That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).
+    &#34;&#34;&#34;
+
+    def __init__(self, *flows, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            *flows (Flow): sequence of flows.
+        &#34;&#34;&#34;
+
+        assert flows, &#39;Sequential constructor called with 0 flows&#39;
+
+        dim = { flow.dim for flow in flows }
+        assert len(dim) == 1, \
+            &#39;All flows in a Sequential must have the same dim&#39;
+        dim = dim.pop() # just the one
+        assert dim == kwargs.pop(&#39;dim&#39;, dim), &#39;dim and flows dim do not match&#39;
+
+        super().__init__(dim=dim, **kwargs)
+        self.flows = nn.ModuleList(flows) # save flows in ModuleList
+
+
+    # Method overrides
+    def _transform(self, x, log_det=False, **kwargs):
+        log_det_sum = 0.
+        
+        for flow in self.flows:
+            res = flow(x, log_det=log_det, **kwargs)
+
+            if log_det:
+                x, log_det_i = res
+                log_det_sum = log_det_sum + log_det_i
+            else:
+                x = res
+
+        if log_det:
+            return x, log_det_sum
+        else:
+            return x
+
+    def _invert(self, u, log_det=False, **kwargs):
+        log_det_sum = 0.
+
+        for flow in reversed(self.flows):
+            res = flow(u, invert=True, log_det=log_det, **kwargs)
+
+            if log_det:
+                u, log_det_i = res
+                log_det_sum = log_det_sum + log_det_i
+            else:
+                u = res
+
+        if log_det:
+            return u, log_det_sum
+        else:
+            return u
+
+
+    # Utilities
+    def warm_start(self, x, **kwargs):
+        &#34;&#34;&#34;Call warm_start(x, **kwargs) to each subflow.
+
+        Note that x will be progressively transformed before each 
+        call to warm_start, from x to u.
+        &#34;&#34;&#34;
+
+        for flow in self.flows:
+            flow.warm_start(x, **kwargs)
+
+            with torch.no_grad():
+                x = flow(x, **kwargs)
+
+        return self
+
+    def __getitem__(self, k):
+        &#34;&#34;&#34;Access subflows by indexing. 
+
+        Single ints return the corresponding subflow, 
+        while slices return a `Sequential` of the corresponding subflows.
+        &#34;&#34;&#34;
+
+        if isinstance(k, int):
+            return self.flows[k]
+        elif isinstance(k, slice):
+            return Sequential(*self.flows[k])
+        else:
+            raise ValueError(k)
+
+    def __iter__(self):
+        for flow in self.flows:
+            yield flow
+
+
+    # Device overrides
+    def _update_device(self, device):
+        # Also call all its subflows _update_device(device) methods
+        for flow in self.flows:
+            flow._update_device(device)
+
+        return super()._update_device(device)
+
+
+class Conditioner(Flow):
+    &#34;&#34;&#34;Implement Flow by use of a conditioner and a transformer.
+
+    This class is the conditioner itself, but acts as a flow,
+    and receives the transformer as an input for its constructor. 
+
+    Can also be used as a Conditional Flow, meaning, 
+    a given input tensor conditions on the distribution modelled by the Flow.
+    In that case, pass cond_dim &gt; 0 to the constructor.
+    If a Conditioner cannot be conditional, specify the class attribute,
+    conditional = False. If a non-conditional Conditioner has cond_dim &gt; 0,
+    it raises a ValueError on initialization.
+
+    Any class that inherits from Conditioner needs to implement:
+    ```python
+    def _h(self, x, cond=None, **kwargs): 
+        # Return the (non-activated) tensor of parameters h 
+        # corresponding to the given x. If this is a conditional flow,
+        # the conditioning tensor is passed as the &#39;cond&#39; kwarg.
+        ...
+
+    def _invert(self, u, cond=None, log_det=False, **kwargs): 
+        # Transform u into x.
+        ...
+    ```
+
+    Note that a Conditioner does not require an implementation 
+    for method _transform, since it is dealt with by the transformer.
+    However, it does need one for _invert, 
+    since it depends on the implemented conditioner.&#34;&#34;&#34;
+
+
+    conditional = True
+    &#34;&#34;&#34;Whether this class can model conditional distributions (cond_dim &gt; 0).&#34;&#34;&#34;
+
+    def __init__(self, trnf, cond_dim=0, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            trnf (Transformer): transformer.
+            cond_dim (int): if you want to use a conditional flow,
+                this is the dimension of the conditioning tensor.
+        &#34;&#34;&#34;
+
+        dim = trnf.dim
+        assert kwargs.pop(&#39;dim&#39;, dim) == dim
+
+        super().__init__(dim=dim, **kwargs)
+
+        self.trnf = trnf
+        assert cond_dim &gt;= 0
+        self.cond_dim = cond_dim
+
+        # not conditional -&gt; cond_dim == 0
+        if not self.conditional and cond_dim &gt; 0:
+            raise ValueError(
+                &#39;This Conditioner is non-conditional, &#39;
+                &#39;so cond_dim needs to be 0.&#39;
+            )
+
+
+    # Method overrides
+    def _transform(self, x, log_det=False, cond=None, **kwargs):
+        if self.cond_dim and cond is None:
+            raise ValueError(&#39;cond is None but cond_dim &gt; 0&#39;)
+        if self.cond_dim and cond.size(1) != self.cond_dim:
+            raise ValueError(
+                f&#39;Invalid cond dim {cond.size(1)}; expected {self.cond_dim}&#39;
+            )
+
+        h = self._h(x, cond=cond, **kwargs)
+        return self.trnf(x, h, log_det=log_det, **kwargs)
+
+    # Extend warm_start to also call trnf.warm_start
+    def warm_start(self, x, **kwargs):
+        self.trnf.warm_start(x, **kwargs)
+
+        return super().warm_start(x, **kwargs)
+
+
+    # Override these methods
+    def _h(self, x, cond=None, **kwargs):
+        &#34;&#34;&#34;Compute the non-activated parameters for the transformer.&#34;&#34;&#34;
+        raise NotImplementedError()
+
+    def _invert(self, u, log_det=False, cond=None, **kwargs):
+        &#34;&#34;&#34;Transform u into x.&#34;&#34;&#34;
+        raise NotImplementedError()
+
+
+    # Utilities
+    def _prepend_cond(self, x, cond=None):
+        &#34;&#34;&#34;Return torch.cat([cond, x], 1), broadcasting cond if necessary.
+    
+        If cond is None, does nothing to x. Useful to avoid checking for cond
+        and preprocessing it every time.
+        &#34;&#34;&#34;
+        if cond is None:
+            return x
+        else:
+            if cond.size(0) &lt; x.size(0):
+                cond = cond.repeat(x.size(0) // cond.size(0), 1)
+            
+            assert cond.size(0) == x.size(0)
+            return torch.cat([cond, x], 1)
+
+
+    # Device overrides
+    # Extend _update_device to also call it for its transformer.
+    def _update_device(self, device):
+        self.trnf._update_device(device)
+
+        return super()._update_device(device)
+
+
+class Transformer(Flow):
+    &#34;&#34;&#34;Transformer class used as a part of any Conditioner-Flow.
+
+    Any class that inherits from Transformer needs to implement:
+    ```python
+    def __init__(self, **kwargs):
+        # Extend the constructor to pass, to its base class,
+        # the required kwarg h_dim &gt;= 0. 
+        ...
+        super().__init__(h_dim=h_dim, **kwargs)
+        ...
+
+    def _activation(self, h, **kwargs): 
+        # Transform h by activation before calling _transform or _invert.
+        # 
+        # For example, for a scale parameter, _activation could pass h
+        # through a softplus function to make it positive.
+        # Returns a tuple with the activated tensor parameters.
+        ...
+
+    def _transform(self, x, *h, log_det=False, **kwargs): 
+        # Transform x into u using parameters h.
+        ...
+
+    def _invert(self, x, *h, log_det=False, **kwargs):
+        # Transform u into x using parameters h.
+        ...
+    ```
+
+    Note that forward, _transform and _invert all receive h,
+    that contains the parameters for the transformation.
+
+    The required attribute h_dim represents the dimensionality 
+    of the required parameters for each dimension in the flow.
+    As an example, an Affine transformer has h_dim=2 (loc and scale)
+    for each dimension in the flow.
+
+    CAUTION: all three methods need to be general enough 
+        to work with dim=1 or an arbitrary dim,
+        since the conditioner might pass any number of dimensions
+        to transform depending on how it works.
+    &#34;&#34;&#34;
+
+    def __init__(self, **kwargs):
+        &#34;&#34;&#34;&#34;&#34;&#34; # to avoid inheriting its parent in the documentation.
+        super().__init__(**kwargs)
+
+        self.h_dim = kwargs.get(&#39;h_dim&#39;, -1)
+        assert self.h_dim &gt;= 0
+
+    def forward(self, t, h, invert=False, log_det=False, **kwargs):
+        r&#34;&#34;&#34;Call _activation(h) and pass it to _transform or _invert.
+
+        Args:
+            t (torch.Tensor): tensor to transform.
+            h (torch.Tensor): parameters for the transformation, 
+                to be pre-processed with _activation. 
+                This tensor comes from Conditioner._h.
+            invert (bool): whether to call _transform (True) 
+                or _invert (False) on t.
+            log_det (bool): whether to return \(\log |\det J_T|\)
+                of the current transformation T.
+
+        Returns:
+            t: transformed tensor, either u if invert=False
+                or x if invert=True.
+            log_det: only returned if log_det=True.
+                Tensor containing \(\log |\det J_T|\), 
+                where T is the applied transformation. 
+        &#34;&#34;&#34;
+
+        h = self._activation(h, **kwargs)
+        assert isinstance(h, tuple), &#39;trnf._activation(h) must return a tuple&#39;
+
+        if not invert: 
+            return self._transform(t, *h, log_det=log_det, **kwargs)
+        else:
+            return self._invert(t, *h, log_det=log_det, **kwargs)
+
+
+    # Override these methods
+    def _activation(self, h, **kwargs):
+        &#34;&#34;&#34;Transform h by activation before calling _transform or _invert.
+
+        Args:
+            h (torch.Tensor): tensor with the pre-activation parameters.
+        
+        Returns:
+            parameters: tuple of parameter tensors.
+
+        Example:
+            For a scale parameter, _activation could pass h
+            through a softplus function to make it positive.
+        &#34;&#34;&#34;
+        raise NotImplementedError()
+
+    def _transform(self, x, *h, log_det=False, **kwargs):
+        raise NotImplementedError()
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        raise NotImplementedError()</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="flow.flow.inv_flow"><code class="name flex">
+<span>def <span class="ident">inv_flow</span></span>(<span>flow_cls, name=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform a Flow class so that _transform and _invert are swapped.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>flow_cls</code></strong> :&ensp;<code>class</code></dt>
+<dd><code><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></code> class to inherit from.</dd>
+<dt><strong><code>name</code></strong> :&ensp;<code>str</code></dt>
+<dd>name to use for the new class.
+If None, defaults to 'Inv' + flow_cls.<strong>name</strong></dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def inv_flow(flow_cls, name=None):
+    &#34;&#34;&#34;Transform a Flow class so that _transform and _invert are swapped.
+    
+    Args:
+        flow_cls (class): `Flow` class to inherit from.
+        name (str): name to use for the new class. 
+            If None, defaults to &#39;Inv&#39; + flow_cls.__name__
+    &#34;&#34;&#34;
+    if name is None:
+        name = &#39;Inv&#39; + flow_cls.__name__
+
+    class InvFlow(flow_cls):
+
+        # Extend forward to swap _transform and _invert
+        def forward(self, t, invert=False, **kwargs):
+            return super().forward(t, invert=not invert, **kwargs)
+
+    InvFlow.__name__ = name
+    InvFlow.__doc__ = (
+        &#39;Inverse flow. Note that _transform and _invert &#39;
+        &#39;are swapped in this Flow.\n&#39;
+    ) + __doc__
+
+    return InvFlow</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="flow.flow.Conditioner"><code class="flex name class">
+<span>class <span class="ident">Conditioner</span></span>
+<span>(</span><span>trnf, cond_dim=0, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Implement Flow by use of a conditioner and a transformer.</p>
+<p>This class is the conditioner itself, but acts as a flow,
+and receives the transformer as an input for its constructor. </p>
+<p>Can also be used as a Conditional Flow, meaning,
+a given input tensor conditions on the distribution modelled by the Flow.
+In that case, pass cond_dim &gt; 0 to the constructor.
+If a Conditioner cannot be conditional, specify the class attribute,
+conditional = False. If a non-conditional Conditioner has cond_dim &gt; 0,
+it raises a ValueError on initialization.</p>
+<p>Any class that inherits from Conditioner needs to implement:</p>
+<pre><code class="python">def _h(self, x, cond=None, **kwargs): 
+    # Return the (non-activated) tensor of parameters h 
+    # corresponding to the given x. If this is a conditional flow,
+    # the conditioning tensor is passed as the 'cond' kwarg.
+    ...
+
+def _invert(self, u, cond=None, log_det=False, **kwargs): 
+    # Transform u into x.
+    ...
+</code></pre>
+<p>Note that a Conditioner does not require an implementation
+for method _transform, since it is dealt with by the transformer.
+However, it does need one for _invert,
+since it depends on the implemented conditioner.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>trnf</code></strong> :&ensp;<code><a title="flow.flow.Transformer" href="#flow.flow.Transformer">Transformer</a></code></dt>
+<dd>transformer.</dd>
+<dt><strong><code>cond_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>if you want to use a conditional flow,
+this is the dimension of the conditioning tensor.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Conditioner(Flow):
+    &#34;&#34;&#34;Implement Flow by use of a conditioner and a transformer.
+
+    This class is the conditioner itself, but acts as a flow,
+    and receives the transformer as an input for its constructor. 
+
+    Can also be used as a Conditional Flow, meaning, 
+    a given input tensor conditions on the distribution modelled by the Flow.
+    In that case, pass cond_dim &gt; 0 to the constructor.
+    If a Conditioner cannot be conditional, specify the class attribute,
+    conditional = False. If a non-conditional Conditioner has cond_dim &gt; 0,
+    it raises a ValueError on initialization.
+
+    Any class that inherits from Conditioner needs to implement:
+    ```python
+    def _h(self, x, cond=None, **kwargs): 
+        # Return the (non-activated) tensor of parameters h 
+        # corresponding to the given x. If this is a conditional flow,
+        # the conditioning tensor is passed as the &#39;cond&#39; kwarg.
+        ...
+
+    def _invert(self, u, cond=None, log_det=False, **kwargs): 
+        # Transform u into x.
+        ...
+    ```
+
+    Note that a Conditioner does not require an implementation 
+    for method _transform, since it is dealt with by the transformer.
+    However, it does need one for _invert, 
+    since it depends on the implemented conditioner.&#34;&#34;&#34;
+
+
+    conditional = True
+    &#34;&#34;&#34;Whether this class can model conditional distributions (cond_dim &gt; 0).&#34;&#34;&#34;
+
+    def __init__(self, trnf, cond_dim=0, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            trnf (Transformer): transformer.
+            cond_dim (int): if you want to use a conditional flow,
+                this is the dimension of the conditioning tensor.
+        &#34;&#34;&#34;
+
+        dim = trnf.dim
+        assert kwargs.pop(&#39;dim&#39;, dim) == dim
+
+        super().__init__(dim=dim, **kwargs)
+
+        self.trnf = trnf
+        assert cond_dim &gt;= 0
+        self.cond_dim = cond_dim
+
+        # not conditional -&gt; cond_dim == 0
+        if not self.conditional and cond_dim &gt; 0:
+            raise ValueError(
+                &#39;This Conditioner is non-conditional, &#39;
+                &#39;so cond_dim needs to be 0.&#39;
+            )
+
+
+    # Method overrides
+    def _transform(self, x, log_det=False, cond=None, **kwargs):
+        if self.cond_dim and cond is None:
+            raise ValueError(&#39;cond is None but cond_dim &gt; 0&#39;)
+        if self.cond_dim and cond.size(1) != self.cond_dim:
+            raise ValueError(
+                f&#39;Invalid cond dim {cond.size(1)}; expected {self.cond_dim}&#39;
+            )
+
+        h = self._h(x, cond=cond, **kwargs)
+        return self.trnf(x, h, log_det=log_det, **kwargs)
+
+    # Extend warm_start to also call trnf.warm_start
+    def warm_start(self, x, **kwargs):
+        self.trnf.warm_start(x, **kwargs)
+
+        return super().warm_start(x, **kwargs)
+
+
+    # Override these methods
+    def _h(self, x, cond=None, **kwargs):
+        &#34;&#34;&#34;Compute the non-activated parameters for the transformer.&#34;&#34;&#34;
+        raise NotImplementedError()
+
+    def _invert(self, u, log_det=False, cond=None, **kwargs):
+        &#34;&#34;&#34;Transform u into x.&#34;&#34;&#34;
+        raise NotImplementedError()
+
+
+    # Utilities
+    def _prepend_cond(self, x, cond=None):
+        &#34;&#34;&#34;Return torch.cat([cond, x], 1), broadcasting cond if necessary.
+    
+        If cond is None, does nothing to x. Useful to avoid checking for cond
+        and preprocessing it every time.
+        &#34;&#34;&#34;
+        if cond is None:
+            return x
+        else:
+            if cond.size(0) &lt; x.size(0):
+                cond = cond.repeat(x.size(0) // cond.size(0), 1)
+            
+            assert cond.size(0) == x.size(0)
+            return torch.cat([cond, x], 1)
+
+
+    # Device overrides
+    # Extend _update_device to also call it for its transformer.
+    def _update_device(self, device):
+        self.trnf._update_device(device)
+
+        return super()._update_device(device)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="flow.conditioner.AutoregressiveNaive" href="conditioner.html#flow.conditioner.AutoregressiveNaive">AutoregressiveNaive</a></li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="flow.flow.Conditioner.conditional"><code class="name">var <span class="ident">conditional</span></code></dt>
+<dd>
+<div class="desc"><p>Whether this class can model conditional distributions (cond_dim &gt; 0).</p></div>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.flow.Flow"><code class="flex name class">
+<span>class <span class="ident">Flow</span></span>
+<span>(</span><span>dim=1, prior=None, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Base abstract class for any Flow. </p>
+<p>A Flow represents a diffeomorphic T such that U = T(X),
+where X is the data distribution and U is the base distribution,
+a standard Normal distribution by default.</p>
+<p>Any class that inherits from Flow needs to implement:</p>
+<pre><code class="python">def _transform(self, x, log_det=False, **kwargs): 
+    # Transforms x into u. Used for training.
+    ...
+
+def _invert(self, u, log_det=False, **kwargs): 
+    # Transforms u into x. Used for sampling.
+    ...
+
+def warm_start(self, x, **kwargs):
+    # Warm start operation for the flow, if necessary.
+    ...
+</code></pre>
+<p>Both _transform and _invert may also return log|det J_T| if log_det is True.
+Otherwise, they only return the transformed tensor.</p>
+<p>Note that in training, using forward or backward KL divergence,
+_transform or _invert should be differentiable w.r.t. the flow's parameters,
+respectively. Otherwise, the flow would not learn.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>dimensionality of this flow. Defaults to 1.</dd>
+<dt><strong><code>prior</code></strong> :&ensp;<code>class</code></dt>
+<dd>prior class for U (inheriting <code><a title="flow.prior.Prior" href="prior.html#flow.prior.Prior">Prior</a></code>).
+Used for sampling and in the computation of nll.
+If None, defaults to <code><a title="flow.prior.Normal" href="prior.html#flow.prior.Normal">Normal</a></code>.
+If this flow is in a <code><a title="flow.flow.Sequential" href="#flow.flow.Sequential">Sequential</a></code>, its prior is ignored.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Flow(nn.Module):
+    r&#34;&#34;&#34;Base abstract class for any Flow. 
+
+    A Flow represents a diffeomorphic T such that U = T(X),
+    where X is the data distribution and U is the base distribution,
+    a standard Normal distribution by default.
+
+    Any class that inherits from Flow needs to implement:
+    ```python
+    def _transform(self, x, log_det=False, **kwargs): 
+        # Transforms x into u. Used for training.
+        ...
+
+    def _invert(self, u, log_det=False, **kwargs): 
+        # Transforms u into x. Used for sampling.
+        ...
+
+    def warm_start(self, x, **kwargs):
+        # Warm start operation for the flow, if necessary.
+        ...
+    ```
+
+    Both _transform and _invert may also return log|det J_T| if log_det is True.
+    Otherwise, they only return the transformed tensor.
+
+    Note that in training, using forward or backward KL divergence,
+    _transform or _invert should be differentiable w.r.t. the flow&#39;s parameters,
+    respectively. Otherwise, the flow would not learn.
+    &#34;&#34;&#34;
+
+    def __init__(self, dim=1, prior=None, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            dim (int): dimensionality of this flow. Defaults to 1.
+            prior (class): prior class for U (inheriting `flow.prior.Prior`).
+                Used for sampling and in the computation of nll.
+                If None, defaults to `flow.prior.Normal`.
+                If this flow is in a `Sequential`, its prior is ignored.
+        &#34;&#34;&#34;
+        super().__init__()
+
+        self.dim = dim
+
+        if prior is None:
+            prior = NormalPrior(dim=dim)
+        else:
+            assert prior.dim == dim
+        
+        self.prior = prior
+        self.device = torch.device(&#39;cpu&#39;)
+
+
+    def forward(self, t, invert=False, log_det=False, **kwargs):
+        r&#34;&#34;&#34;Call _transform (x -&gt; u) or _invert (u -&gt; x) on t.
+
+        Args:
+            t (torch.Tensor): tensor to transform.
+            invert (bool): whether to call _transform (True) 
+                or _invert (False) on t.
+            log_det (bool): whether to return \(\log |\det J_T|\)
+                of the current transformation T.
+
+        Returns:
+            t: transformed tensor, either u if invert=False
+                or x if invert=True.
+            log_det: only returned if log_det=True.
+                Tensor containing \(\log |\det J_T|\), 
+                where T is the applied transformation. 
+        &#34;&#34;&#34;
+
+        if not invert:
+            return self._transform(t, **kwargs, log_det=log_det)
+        else:
+            return self._invert(t, **kwargs, log_det=log_det)
+
+
+    # Override these methods
+    def _transform(self, x, log_det=False, **kwargs):
+        &#34;&#34;&#34;Transform x into u.&#34;&#34;&#34;
+        raise NotImplementedError()
+
+    def _invert(self, u, log_det=False, **kwargs):
+        &#34;&#34;&#34;Transform u into x.&#34;&#34;&#34;
+        raise NotImplementedError()
+
+    def warm_start(self, x, **kwargs):
+        &#34;&#34;&#34;Perform a warm_start operation to the flow (optional).
+
+        Args:
+            x (torch.Tensor): dataset sample to use in the warming up.
+
+        Returns:
+            self
+        &#34;&#34;&#34;
+        return self
+
+
+    # Utilities
+    def sample(self, n, **kwargs):
+        &#34;&#34;&#34;Generate n samples from X.&#34;&#34;&#34;
+        assert self.prior is not None
+        
+        u = self.prior.sample(n)
+        x = self(u, **kwargs, invert=True)
+
+        return x
+
+    def nll(self, x, **kwargs):
+        &#34;&#34;&#34;Compute the negative log-likelihood of samples x.
+
+        The result of this function can directly be used 
+        as the MLE training loss for a flow.
+        &#34;&#34;&#34;
+        assert self.prior is not None
+
+        u, log_det = self(x, **kwargs, log_det=True)
+
+        return self.prior.nll(u) - log_det
+
+    def reverse_kl(self, n, nll_x, **kwargs):
+        &#34;&#34;&#34;Compute the reverse KL divergence of n prior samples.
+
+        Used to train flows in reverse mode.
+        Useful to create samplers from a known density function.
+
+        Args:
+            n (int): number of samples.
+            nll_x (function): negative log-density function of x.
+                Also receives **kwargs.
+        &#34;&#34;&#34;
+        assert self.prior is not None
+
+        u = self.prior.sample(n)
+        loglk_u = -self.prior.nll(u)
+
+        x, log_det = self._invert(u, log_det=True, **kwargs)
+        loglk_x = -nll_x(x, **kwargs)
+
+        return loglk_u - log_det - loglk_x
+
+
+    # Device overrides
+    def _update_device(self, device):
+        &#34;&#34;&#34;Update saved device for this flow and all its subcomponents.&#34;&#34;&#34;
+        if self.prior is not None:
+            self.prior._update_device(device)
+
+        self.device = device
+
+    def to(self, device):
+        &#34;&#34;&#34;Override .to(device) so as to call _update_device(device).&#34;&#34;&#34;
+        self._update_device(device)
+
+        return super().to(device)
+
+    def cpu(self):
+        &#34;&#34;&#34;Override .cpu so as to call .to method.&#34;&#34;&#34;
+        return self.to(torch.device(&#39;cpu&#39;))
+
+    def cuda(self):
+        &#34;&#34;&#34;Override .cuda so as to call .to method.&#34;&#34;&#34;
+        return self.to(torch.device(&#39;cuda&#39;, index=0))</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Conditioner" href="#flow.flow.Conditioner">Conditioner</a></li>
+<li><a title="flow.flow.Sequential" href="#flow.flow.Sequential">Sequential</a></li>
+<li><a title="flow.flow.Transformer" href="#flow.flow.Transformer">Transformer</a></li>
+<li><a title="flow.modules.Affine" href="modules.html#flow.modules.Affine">Affine</a></li>
+<li><a title="flow.modules.BatchNorm" href="modules.html#flow.modules.BatchNorm">BatchNorm</a></li>
+<li><a title="flow.modules.LeakyReLU" href="modules.html#flow.modules.LeakyReLU">LeakyReLU</a></li>
+<li><a title="flow.modules.LogSigmoid" href="modules.html#flow.modules.LogSigmoid">LogSigmoid</a></li>
+<li><a title="flow.modules.Sigmoid" href="modules.html#flow.modules.Sigmoid">Sigmoid</a></li>
+<li><a title="flow.modules.Softplus" href="modules.html#flow.modules.Softplus">Softplus</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="flow.flow.Flow.cpu"><code class="name flex">
+<span>def <span class="ident">cpu</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Override .cpu so as to call .to method.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def cpu(self):
+    &#34;&#34;&#34;Override .cpu so as to call .to method.&#34;&#34;&#34;
+    return self.to(torch.device(&#39;cpu&#39;))</code></pre>
+</details>
+</dd>
+<dt id="flow.flow.Flow.cuda"><code class="name flex">
+<span>def <span class="ident">cuda</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Override .cuda so as to call .to method.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def cuda(self):
+    &#34;&#34;&#34;Override .cuda so as to call .to method.&#34;&#34;&#34;
+    return self.to(torch.device(&#39;cuda&#39;, index=0))</code></pre>
+</details>
+</dd>
+<dt id="flow.flow.Flow.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, t, invert=False, log_det=False, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Call _transform (x -&gt; u) or _invert (u -&gt; x) on t.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>t</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>tensor to transform.</dd>
+<dt><strong><code>invert</code></strong> :&ensp;<code>bool</code></dt>
+<dd>whether to call _transform (True)
+or _invert (False) on t.</dd>
+<dt><strong><code>log_det</code></strong> :&ensp;<code>bool</code></dt>
+<dd>whether to return <span><span class="MathJax_Preview">\log |\det J_T|</span><script type="math/tex">\log |\det J_T|</script></span>
+of the current transformation T.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>t</code></dt>
+<dd>transformed tensor, either u if invert=False
+or x if invert=True.</dd>
+<dt><code>log_det</code></dt>
+<dd>only returned if log_det=True.
+Tensor containing <span><span class="MathJax_Preview">\log |\det J_T|</span><script type="math/tex">\log |\det J_T|</script></span>,
+where T is the applied transformation.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, t, invert=False, log_det=False, **kwargs):
+    r&#34;&#34;&#34;Call _transform (x -&gt; u) or _invert (u -&gt; x) on t.
+
+    Args:
+        t (torch.Tensor): tensor to transform.
+        invert (bool): whether to call _transform (True) 
+            or _invert (False) on t.
+        log_det (bool): whether to return \(\log |\det J_T|\)
+            of the current transformation T.
+
+    Returns:
+        t: transformed tensor, either u if invert=False
+            or x if invert=True.
+        log_det: only returned if log_det=True.
+            Tensor containing \(\log |\det J_T|\), 
+            where T is the applied transformation. 
+    &#34;&#34;&#34;
+
+    if not invert:
+        return self._transform(t, **kwargs, log_det=log_det)
+    else:
+        return self._invert(t, **kwargs, log_det=log_det)</code></pre>
+</details>
+</dd>
+<dt id="flow.flow.Flow.nll"><code class="name flex">
+<span>def <span class="ident">nll</span></span>(<span>self, x, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Compute the negative log-likelihood of samples x.</p>
+<p>The result of this function can directly be used
+as the MLE training loss for a flow.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def nll(self, x, **kwargs):
+    &#34;&#34;&#34;Compute the negative log-likelihood of samples x.
+
+    The result of this function can directly be used 
+    as the MLE training loss for a flow.
+    &#34;&#34;&#34;
+    assert self.prior is not None
+
+    u, log_det = self(x, **kwargs, log_det=True)
+
+    return self.prior.nll(u) - log_det</code></pre>
+</details>
+</dd>
+<dt id="flow.flow.Flow.reverse_kl"><code class="name flex">
+<span>def <span class="ident">reverse_kl</span></span>(<span>self, n, nll_x, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Compute the reverse KL divergence of n prior samples.</p>
+<p>Used to train flows in reverse mode.
+Useful to create samplers from a known density function.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>n</code></strong> :&ensp;<code>int</code></dt>
+<dd>number of samples.</dd>
+<dt><strong><code>nll_x</code></strong> :&ensp;<code>function</code></dt>
+<dd>negative log-density function of x.
+Also receives **kwargs.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def reverse_kl(self, n, nll_x, **kwargs):
+    &#34;&#34;&#34;Compute the reverse KL divergence of n prior samples.
+
+    Used to train flows in reverse mode.
+    Useful to create samplers from a known density function.
+
+    Args:
+        n (int): number of samples.
+        nll_x (function): negative log-density function of x.
+            Also receives **kwargs.
+    &#34;&#34;&#34;
+    assert self.prior is not None
+
+    u = self.prior.sample(n)
+    loglk_u = -self.prior.nll(u)
+
+    x, log_det = self._invert(u, log_det=True, **kwargs)
+    loglk_x = -nll_x(x, **kwargs)
+
+    return loglk_u - log_det - loglk_x</code></pre>
+</details>
+</dd>
+<dt id="flow.flow.Flow.sample"><code class="name flex">
+<span>def <span class="ident">sample</span></span>(<span>self, n, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Generate n samples from X.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def sample(self, n, **kwargs):
+    &#34;&#34;&#34;Generate n samples from X.&#34;&#34;&#34;
+    assert self.prior is not None
+    
+    u = self.prior.sample(n)
+    x = self(u, **kwargs, invert=True)
+
+    return x</code></pre>
+</details>
+</dd>
+<dt id="flow.flow.Flow.to"><code class="name flex">
+<span>def <span class="ident">to</span></span>(<span>self, device)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Override .to(device) so as to call _update_device(device).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def to(self, device):
+    &#34;&#34;&#34;Override .to(device) so as to call _update_device(device).&#34;&#34;&#34;
+    self._update_device(device)
+
+    return super().to(device)</code></pre>
+</details>
+</dd>
+<dt id="flow.flow.Flow.warm_start"><code class="name flex">
+<span>def <span class="ident">warm_start</span></span>(<span>self, x, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Perform a warm_start operation to the flow (optional).</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>x</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>dataset sample to use in the warming up.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>self</code></dt>
+<dd>&nbsp;</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def warm_start(self, x, **kwargs):
+    &#34;&#34;&#34;Perform a warm_start operation to the flow (optional).
+
+    Args:
+        x (torch.Tensor): dataset sample to use in the warming up.
+
+    Returns:
+        self
+    &#34;&#34;&#34;
+    return self</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="flow.flow.Sequential"><code class="flex name class">
+<span>class <span class="ident">Sequential</span></span>
+<span>(</span><span>*flows, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Flow defined by a sequence of flows.</p>
+<p>Note that flows are specified in the order X -&gt; U.
+That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>*flows</code></strong> :&ensp;<code><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></code></dt>
+<dd>sequence of flows.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Sequential(Flow):
+    &#34;&#34;&#34;Flow defined by a sequence of flows.
+
+    Note that flows are specified in the order X -&gt; U.
+    That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).
+    &#34;&#34;&#34;
+
+    def __init__(self, *flows, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            *flows (Flow): sequence of flows.
+        &#34;&#34;&#34;
+
+        assert flows, &#39;Sequential constructor called with 0 flows&#39;
+
+        dim = { flow.dim for flow in flows }
+        assert len(dim) == 1, \
+            &#39;All flows in a Sequential must have the same dim&#39;
+        dim = dim.pop() # just the one
+        assert dim == kwargs.pop(&#39;dim&#39;, dim), &#39;dim and flows dim do not match&#39;
+
+        super().__init__(dim=dim, **kwargs)
+        self.flows = nn.ModuleList(flows) # save flows in ModuleList
+
+
+    # Method overrides
+    def _transform(self, x, log_det=False, **kwargs):
+        log_det_sum = 0.
+        
+        for flow in self.flows:
+            res = flow(x, log_det=log_det, **kwargs)
+
+            if log_det:
+                x, log_det_i = res
+                log_det_sum = log_det_sum + log_det_i
+            else:
+                x = res
+
+        if log_det:
+            return x, log_det_sum
+        else:
+            return x
+
+    def _invert(self, u, log_det=False, **kwargs):
+        log_det_sum = 0.
+
+        for flow in reversed(self.flows):
+            res = flow(u, invert=True, log_det=log_det, **kwargs)
+
+            if log_det:
+                u, log_det_i = res
+                log_det_sum = log_det_sum + log_det_i
+            else:
+                u = res
+
+        if log_det:
+            return u, log_det_sum
+        else:
+            return u
+
+
+    # Utilities
+    def warm_start(self, x, **kwargs):
+        &#34;&#34;&#34;Call warm_start(x, **kwargs) to each subflow.
+
+        Note that x will be progressively transformed before each 
+        call to warm_start, from x to u.
+        &#34;&#34;&#34;
+
+        for flow in self.flows:
+            flow.warm_start(x, **kwargs)
+
+            with torch.no_grad():
+                x = flow(x, **kwargs)
+
+        return self
+
+    def __getitem__(self, k):
+        &#34;&#34;&#34;Access subflows by indexing. 
+
+        Single ints return the corresponding subflow, 
+        while slices return a `Sequential` of the corresponding subflows.
+        &#34;&#34;&#34;
+
+        if isinstance(k, int):
+            return self.flows[k]
+        elif isinstance(k, slice):
+            return Sequential(*self.flows[k])
+        else:
+            raise ValueError(k)
+
+    def __iter__(self):
+        for flow in self.flows:
+            yield flow
+
+
+    # Device overrides
+    def _update_device(self, device):
+        # Also call all its subflows _update_device(device) methods
+        for flow in self.flows:
+            flow._update_device(device)
+
+        return super()._update_device(device)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="flow.flow.Sequential.warm_start"><code class="name flex">
+<span>def <span class="ident">warm_start</span></span>(<span>self, x, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Call warm_start(x, **kwargs) to each subflow.</p>
+<p>Note that x will be progressively transformed before each
+call to warm_start, from x to u.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def warm_start(self, x, **kwargs):
+    &#34;&#34;&#34;Call warm_start(x, **kwargs) to each subflow.
+
+    Note that x will be progressively transformed before each 
+    call to warm_start, from x to u.
+    &#34;&#34;&#34;
+
+    for flow in self.flows:
+        flow.warm_start(x, **kwargs)
+
+        with torch.no_grad():
+            x = flow(x, **kwargs)
+
+    return self</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="#flow.flow.Flow.to">to</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.flow.Transformer"><code class="flex name class">
+<span>class <span class="ident">Transformer</span></span>
+<span>(</span><span>**kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transformer class used as a part of any Conditioner-Flow.</p>
+<p>Any class that inherits from Transformer needs to implement:</p>
+<pre><code class="python">def __init__(self, **kwargs):
+    # Extend the constructor to pass, to its base class,
+    # the required kwarg h_dim &gt;= 0. 
+    ...
+    super().__init__(h_dim=h_dim, **kwargs)
+    ...
+
+def _activation(self, h, **kwargs): 
+    # Transform h by activation before calling _transform or _invert.
+    # 
+    # For example, for a scale parameter, _activation could pass h
+    # through a softplus function to make it positive.
+    # Returns a tuple with the activated tensor parameters.
+    ...
+
+def _transform(self, x, *h, log_det=False, **kwargs): 
+    # Transform x into u using parameters h.
+    ...
+
+def _invert(self, x, *h, log_det=False, **kwargs):
+    # Transform u into x using parameters h.
+    ...
+</code></pre>
+<p>Note that forward, _transform and _invert all receive h,
+that contains the parameters for the transformation.</p>
+<p>The required attribute h_dim represents the dimensionality
+of the required parameters for each dimension in the flow.
+As an example, an Affine transformer has h_dim=2 (loc and scale)
+for each dimension in the flow.</p>
+<p>CAUTION: all three methods need to be general enough
+to work with dim=1 or an arbitrary dim,
+since the conditioner might pass any number of dimensions
+to transform depending on how it works.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Transformer(Flow):
+    &#34;&#34;&#34;Transformer class used as a part of any Conditioner-Flow.
+
+    Any class that inherits from Transformer needs to implement:
+    ```python
+    def __init__(self, **kwargs):
+        # Extend the constructor to pass, to its base class,
+        # the required kwarg h_dim &gt;= 0. 
+        ...
+        super().__init__(h_dim=h_dim, **kwargs)
+        ...
+
+    def _activation(self, h, **kwargs): 
+        # Transform h by activation before calling _transform or _invert.
+        # 
+        # For example, for a scale parameter, _activation could pass h
+        # through a softplus function to make it positive.
+        # Returns a tuple with the activated tensor parameters.
+        ...
+
+    def _transform(self, x, *h, log_det=False, **kwargs): 
+        # Transform x into u using parameters h.
+        ...
+
+    def _invert(self, x, *h, log_det=False, **kwargs):
+        # Transform u into x using parameters h.
+        ...
+    ```
+
+    Note that forward, _transform and _invert all receive h,
+    that contains the parameters for the transformation.
+
+    The required attribute h_dim represents the dimensionality 
+    of the required parameters for each dimension in the flow.
+    As an example, an Affine transformer has h_dim=2 (loc and scale)
+    for each dimension in the flow.
+
+    CAUTION: all three methods need to be general enough 
+        to work with dim=1 or an arbitrary dim,
+        since the conditioner might pass any number of dimensions
+        to transform depending on how it works.
+    &#34;&#34;&#34;
+
+    def __init__(self, **kwargs):
+        &#34;&#34;&#34;&#34;&#34;&#34; # to avoid inheriting its parent in the documentation.
+        super().__init__(**kwargs)
+
+        self.h_dim = kwargs.get(&#39;h_dim&#39;, -1)
+        assert self.h_dim &gt;= 0
+
+    def forward(self, t, h, invert=False, log_det=False, **kwargs):
+        r&#34;&#34;&#34;Call _activation(h) and pass it to _transform or _invert.
+
+        Args:
+            t (torch.Tensor): tensor to transform.
+            h (torch.Tensor): parameters for the transformation, 
+                to be pre-processed with _activation. 
+                This tensor comes from Conditioner._h.
+            invert (bool): whether to call _transform (True) 
+                or _invert (False) on t.
+            log_det (bool): whether to return \(\log |\det J_T|\)
+                of the current transformation T.
+
+        Returns:
+            t: transformed tensor, either u if invert=False
+                or x if invert=True.
+            log_det: only returned if log_det=True.
+                Tensor containing \(\log |\det J_T|\), 
+                where T is the applied transformation. 
+        &#34;&#34;&#34;
+
+        h = self._activation(h, **kwargs)
+        assert isinstance(h, tuple), &#39;trnf._activation(h) must return a tuple&#39;
+
+        if not invert: 
+            return self._transform(t, *h, log_det=log_det, **kwargs)
+        else:
+            return self._invert(t, *h, log_det=log_det, **kwargs)
+
+
+    # Override these methods
+    def _activation(self, h, **kwargs):
+        &#34;&#34;&#34;Transform h by activation before calling _transform or _invert.
+
+        Args:
+            h (torch.Tensor): tensor with the pre-activation parameters.
+        
+        Returns:
+            parameters: tuple of parameter tensors.
+
+        Example:
+            For a scale parameter, _activation could pass h
+            through a softplus function to make it positive.
+        &#34;&#34;&#34;
+        raise NotImplementedError()
+
+    def _transform(self, x, *h, log_det=False, **kwargs):
+        raise NotImplementedError()
+
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        raise NotImplementedError()</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="flow.transformer.AdamInvTransformer" href="transformer.html#flow.transformer.AdamInvTransformer">AdamInvTransformer</a></li>
+<li><a title="flow.transformer.Affine" href="transformer.html#flow.transformer.Affine">Affine</a></li>
+<li><a title="flow.transformer.IncreasingMonotonicTransformer" href="transformer.html#flow.transformer.IncreasingMonotonicTransformer">IncreasingMonotonicTransformer</a></li>
+<li><a title="flow.transformer.NewtonInvTransformer" href="transformer.html#flow.transformer.NewtonInvTransformer">NewtonInvTransformer</a></li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="flow.flow.Transformer.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, t, h, invert=False, log_det=False, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Call _activation(h) and pass it to _transform or _invert.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>t</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>tensor to transform.</dd>
+<dt><strong><code>h</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>parameters for the transformation,
+to be pre-processed with _activation.
+This tensor comes from Conditioner._h.</dd>
+<dt><strong><code>invert</code></strong> :&ensp;<code>bool</code></dt>
+<dd>whether to call _transform (True)
+or _invert (False) on t.</dd>
+<dt><strong><code>log_det</code></strong> :&ensp;<code>bool</code></dt>
+<dd>whether to return <span><span class="MathJax_Preview">\log |\det J_T|</span><script type="math/tex">\log |\det J_T|</script></span>
+of the current transformation T.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>t</code></dt>
+<dd>transformed tensor, either u if invert=False
+or x if invert=True.</dd>
+<dt><code>log_det</code></dt>
+<dd>only returned if log_det=True.
+Tensor containing <span><span class="MathJax_Preview">\log |\det J_T|</span><script type="math/tex">\log |\det J_T|</script></span>,
+where T is the applied transformation.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, t, h, invert=False, log_det=False, **kwargs):
+    r&#34;&#34;&#34;Call _activation(h) and pass it to _transform or _invert.
+
+    Args:
+        t (torch.Tensor): tensor to transform.
+        h (torch.Tensor): parameters for the transformation, 
+            to be pre-processed with _activation. 
+            This tensor comes from Conditioner._h.
+        invert (bool): whether to call _transform (True) 
+            or _invert (False) on t.
+        log_det (bool): whether to return \(\log |\det J_T|\)
+            of the current transformation T.
+
+    Returns:
+        t: transformed tensor, either u if invert=False
+            or x if invert=True.
+        log_det: only returned if log_det=True.
+            Tensor containing \(\log |\det J_T|\), 
+            where T is the applied transformation. 
+    &#34;&#34;&#34;
+
+    h = self._activation(h, **kwargs)
+    assert isinstance(h, tuple), &#39;trnf._activation(h) must return a tuple&#39;
+
+    if not invert: 
+        return self._transform(t, *h, log_det=log_det, **kwargs)
+    else:
+        return self._invert(t, *h, log_det=log_det, **kwargs)</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="flow" href="index.html">flow</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="flow.flow.inv_flow" href="#flow.flow.inv_flow">inv_flow</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="flow.flow.Conditioner" href="#flow.flow.Conditioner">Conditioner</a></code></h4>
+<ul class="">
+<li><code><a title="flow.flow.Conditioner.conditional" href="#flow.flow.Conditioner.conditional">conditional</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></code></h4>
+<ul class="two-column">
+<li><code><a title="flow.flow.Flow.cpu" href="#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="flow.flow.Sequential" href="#flow.flow.Sequential">Sequential</a></code></h4>
+<ul class="">
+<li><code><a title="flow.flow.Sequential.warm_start" href="#flow.flow.Sequential.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="flow.flow.Transformer" href="#flow.flow.Transformer">Transformer</a></code></h4>
+<ul class="">
+<li><code><a title="flow.flow.Transformer.forward" href="#flow.flow.Transformer.forward">forward</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.8.1</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>
