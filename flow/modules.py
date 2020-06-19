@@ -77,7 +77,7 @@ class Sigmoid(Flow):
                 \(s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}\).
                 Must be bigger than 0.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         self.alpha = alpha
 
@@ -118,7 +118,7 @@ class Softplus(Flow):
                 Default: 20.
             eps (float): lower-bound to the softplus output.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         assert threshold > 0 and eps > 0
         self.threshold = threshold
@@ -153,7 +153,7 @@ class LogSigmoid(Flow):
         Args:
             alpha (float): alpha parameter used by the `Sigmoid`.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         self.alpha = alpha
 
@@ -188,7 +188,7 @@ class LeakyReLU(Flow):
         Args:
             negative_slope (float): slope used for those x < 0,
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         self.negative_slope = negative_slope
 
