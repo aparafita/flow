@@ -197,8 +197,8 @@ def inv_flow(flow_cls, name=None):
     class InvFlow(flow_cls):
 
         # Extend forward to swap _transform and _invert
-        def forward(self, invert=False, **kwargs):
-            return super().forward(*args, invert=not invert, **kwargs)
+        def forward(self, t, invert=False, **kwargs):
+            return super().forward(t, invert=not invert, **kwargs)
 
     InvFlow.__name__ = name
     InvFlow.__doc__ = (
