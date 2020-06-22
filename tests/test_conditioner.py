@@ -6,7 +6,7 @@ import pytest
 
 import torch
 
-from flow.conditioner import AutoregressiveNaive
+from flow.conditioner import AutoregressiveNaive, MADE
 from flow.transformer import Affine
 
 from utils import torch_eq_float, skip_cuda, no_grad_dec
@@ -15,6 +15,7 @@ from utils import torch_eq_float, skip_cuda, no_grad_dec
 # Fill this list with all conditioners you want to test.
 test_conditioners = [
     AutoregressiveNaive,
+    MADE,
 ]
 
 
@@ -85,3 +86,35 @@ def test_conditional(cond, dim=2, cond_dim=3, seed=123):
     u2 = flow(x, cond=cond2)
 
     # assert not torch_eq_float(u, u2, eps=1e-6)
+
+
+def test_made(dim=2, cond_dim=3):
+    flow = MADE(Affine(dim=dim), cond_dim=cond_dim)
+
+    x = torch.randn(1, dim).requires_grad_(True)
+    cond = torch.randn(1, cond_dim).requires_grad_(True)
+
+
+    # In all cases, cond should receive a gradient.
+    # The gradient coming from the 1st dimension's parameters should be 0
+    h = flow._h(x, cond=cond)
+    h0 = h[:, :flow.trnf.h_dim]
+
+    h0.sum(1).backward()
+
+    assert x.grad[0, 0] == 0
+    assert x.grad[0, 1] == 0
+    assert (cond.grad != 0).all()
+
+
+    # The gradient coming from the 2nd dimension's parameters should be 0
+    # only for the 2nd dimension, not the first one.
+    x.grad, cond.grad = None, None
+    h = flow._h(x, cond=cond)
+    h1 = h[:, flow.trnf.h_dim:]
+
+    h1.sum(1).backward()
+
+    assert x.grad[0, 0] != 0
+    assert x.grad[0, 1] == 0
+    assert (cond.grad != 0).all()

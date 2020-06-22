@@ -367,7 +367,7 @@ class Conditioner(Flow):
         self.cond_dim = cond_dim
 
         # not conditional -> cond_dim == 0
-        if not self.conditional and cond_dim > 0:
+        if not self.conditional and cond_dim:
             raise ValueError(
                 'This Conditioner is non-conditional, '
                 'so cond_dim needs to be 0.'
@@ -375,15 +375,23 @@ class Conditioner(Flow):
 
 
     # Method overrides
-    def _transform(self, x, log_det=False, cond=None, **kwargs):
-        if self.cond_dim and cond is None:
-            raise ValueError('cond is None but cond_dim > 0')
-        if self.cond_dim and cond.size(1) != self.cond_dim:
-            raise ValueError(
-                f'Invalid cond dim {cond.size(1)}; expected {self.cond_dim}'
-            )
+    def forward(self, *args, cond=None, **kwargs):
+        """Extend forward to include cond attribute, for conditional flows."""
+        if self.conditional and self.cond_dim:
+            if cond is None:
+                raise ValueError('cond is None but cond_dim > 0')
+            elif cond.size(1) != self.cond_dim:
+                raise ValueError(
+                    f'Invalid cond dim {cond.size(1)}; expected {self.cond_dim}'
+                )
+        elif cond is not None:
+            raise ValueError('Passing cond != None to non-conditional flow')
 
+        super().forward(*args, cond=cond, **kwargs)
+
+    def _transform(self, x, log_det=False, cond=None, **kwargs):
         h = self._h(x, cond=cond, **kwargs)
+        
         return self.trnf(x, h, log_det=log_det, **kwargs)
 
     # Extend warm_start to also call trnf.warm_start
