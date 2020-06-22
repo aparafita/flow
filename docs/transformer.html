@@ -58,7 +58,7 @@ class Affine(Transformer):
     def __init__(self, eps=1e-6, **kwargs):
         &#34;&#34;&#34;
         Args:
-            eps (float): lower-bound for strictly-positive h parameters.
+            eps (float): lower-bound for scale parameter.
         &#34;&#34;&#34;
 
         _h_dim = 2
@@ -557,7 +557,7 @@ If None, u = torch.randn_like(x).</dd>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>eps</code></strong> :&ensp;<code>float</code></dt>
-<dd>lower-bound for strictly-positive h parameters.</dd>
+<dd>lower-bound for scale parameter.</dd>
 </dl></div>
 <details class="source">
 <summary>
@@ -570,7 +570,7 @@ If None, u = torch.randn_like(x).</dd>
     def __init__(self, eps=1e-6, **kwargs):
         &#34;&#34;&#34;
         Args:
-            eps (float): lower-bound for strictly-positive h parameters.
+            eps (float): lower-bound for scale parameter.
         &#34;&#34;&#34;
 
         _h_dim = 2

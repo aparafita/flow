@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.8.1" />
 <title>flow.conditioner API documentation</title>
-<meta name="description" content="Implementations for Flow-Conditioners." />
+<meta name="description" content="Implementations for Flow-Conditioners …" />
 <link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
 <link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
@@ -22,12 +22,24 @@
 </header>
 <section id="section-intro">
 <p>Implementations for Flow-Conditioners.</p>
+<p>Conditioners implemented in this class:</p>
+<ul>
+<li><code><a title="flow.conditioner.AutoregressiveNaive" href="#flow.conditioner.AutoregressiveNaive">AutoregressiveNaive</a></code>: conditioner defined by a separate network
+for each dimension. Only use for one-dimensional flows.</li>
+<li><code><a title="flow.conditioner.MADE" href="#flow.conditioner.MADE">MADE</a></code>: Masked Autoregressive flow for Density Estimation.</li>
+</ul>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">&#34;&#34;&#34;
 Implementations for Flow-Conditioners.
+
+Conditioners implemented in this class:
+
+* `AutoregressiveNaive`: conditioner defined by a separate network 
+    for each dimension. Only use for one-dimensional flows.
+* `MADE`: Masked Autoregressive flow for Density Estimation.
 &#34;&#34;&#34;
 
 import numpy as np
@@ -145,15 +157,6 @@ class AutoregressiveNaive(Conditioner):
 
     # Override methods
     def _h(self, x, cond=None, start=0):
-        if self.cond_dim &gt; 0:
-            if cond is None:
-                raise ValueError(&#39;cond can\&#39;t be None if cond_dim &gt; 0&#39;)
-            if cond.size(1) != self.cond_dim:
-                raise ValueError(
-                    f&#39;cond dim ({cond.size(1)}) &#39;
-                    &#39;doesn\&#39;t fit cond_dim ({self.cond_dim})&#39;
-                )
-
         assert 0 &lt;= start and start &lt;= min(self.dim - 1, x.size(1))
         x = self._prepend_cond(x, cond)
 
@@ -179,7 +182,181 @@ class AutoregressiveNaive(Conditioner):
             _, log_det = self.trnf(u, h, log_det=True, invert=True)
             return x, log_det
         else:
-            return x</code></pre>
+            return x
+
+
+# MADE
+# ------------------------------------------------------------------------------
+
+
+class MaskedLinear(nn.Linear):
+    &#34;&#34;&#34;Extend `torch.nn.Linear` to use a boolean mask on its weights.&#34;&#34;&#34;
+
+    def __init__(self, in_features, out_features, bias=True, mask=None):
+        &#34;&#34;&#34;
+        Args:
+            in_features (int): size of each input sample.
+            out_features (int): size of each output sampl.
+            bias (bool): If set to False, 
+                the layer will not learn an additive bias. 
+            mask (torch.Tensor): boolean mask to apply to the weights.
+                Tensor of shape (out_features, in_features).
+                If None, defaults to an unmasked Linear layer.
+        &#34;&#34;&#34;
+        super().__init__(in_features, out_features, bias)
+        
+        if mask is None:
+            mask = torch.ones(out_features, in_features, dtype=bool)
+        else:
+            mask = mask.bool()
+
+        assert mask.shape == (out_features, in_features)
+        self.register_buffer(&#39;mask&#39;, mask)
+
+    def forward(self, input):
+        &#34;&#34;&#34;Extend forward to include the buffered mask.&#34;&#34;&#34;
+        return F.linear(input, self.mask * self.weight, self.bias)
+
+    def set_mask(self, mask):
+        &#34;&#34;&#34;Set the buffered mask to the given tensor.&#34;&#34;&#34;
+        self.mask.data = mask
+
+
+class MADE_Net(nn.Sequential):
+    &#34;&#34;&#34;Feed-forward network with masked linear layers used for MADE.&#34;&#34;&#34;
+            
+    def __init__(
+        self, 
+        input_dim, output_dim, 
+        hidden_sizes_mult=[10, 5], act=nn.ReLU,
+        cond_dim=0
+    ):
+        &#34;&#34;&#34;
+        Args:
+            input_dim (int): number of inputs (flow dimension).
+            output_dim (int): number of outputs (trnf.dim * trnf.h_dim).
+                Note that all parameters corresponding to a dimension
+                are concatenated together. Therefore, for a 3D-affine trnf:
+                    mu0, sigma0, mu1, sigma1, mu2, sigma2. 
+            hidden_sizes_mult (list): multiplier w.r.t. input_size
+                for each of the hidden layers.
+            act (nn.Module): activation layer to use. 
+                If None, no activation is done.
+            cond_dim (int): dimensionality of the conditioning tensor, if any.
+                non-negative int. If cond_dim &gt; 0, the cond tensor is expected 
+                to be concatenated before the input dimensions.
+        &#34;&#34;&#34;
+
+        super().__init__()
+
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        assert not output_dim % input_dim
+        self.h_dim = output_dim // input_dim
+
+        assert all(isinstance(m, int) and m &gt;= 1 for m in hidden_sizes_mult)
+        self.hidden_sizes = [ 
+            (input_dim + (cond_dim &gt; 0)) * m 
+            for m in hidden_sizes_mult 
+        ]
+
+        assert isinstance(cond_dim, int) and cond_dim &gt;= 0
+        self.cond_dim = cond_dim
+
+        # Add all layers to the Sequential module
+        # Define mask connectivity
+        m = [ 
+            torch.arange(-cond_dim, input_dim) + 1
+        ] + [
+            (
+                torch.randperm(input_dim + (cond_dim &gt; 0)) + 
+                (cond_dim == 0)
+            ).repeat(m) # 0 means cond input, &gt; 0 are the actual inputs
+            for m in hidden_sizes_mult
+        ] + [ 
+            torch.arange(1, input_dim + 1)\
+                .view(-1, 1).repeat(1, self.h_dim).flatten()
+        ]
+
+        # Create the actual layers
+        for k, (m0, m1) in enumerate(zip(m[:-1], m[1:])):
+            # Define masks
+            h0, h1 = m0.size(0), m1.size(0)
+
+            # Check mask size
+            if k == 0:
+                assert h0 == input_dim + cond_dim
+            elif k &lt; len(self.hidden_sizes):
+                assert (h0, h1) == tuple(self.hidden_sizes[k-1:k+1]), \
+                    (h0, h1, self.hidden_sizes[k-1:k+1])
+            else:
+                assert h1 == output_dim
+
+            # Create mask
+            if k &lt; len(self.hidden_sizes):
+                mask = m1.unsqueeze(1) &gt;= m0.unsqueeze(0)
+            else:
+                mask = m1.unsqueeze(1) &gt; m0.unsqueeze(0)
+
+            # Add it to the masked layer
+            self.add_module(
+                &#39;masked_linear_%d&#39; % k,
+                MaskedLinear(h0, h1, bias=True, mask=mask)
+            )
+
+            # Add an activation if not the last layer
+            if act is not None and k &lt; len(m) - 2: # not the last one
+                self.add_module(f&#39;{act.__name__}_{k}&#39;, act())
+
+
+class MADE(Conditioner):
+    &#34;&#34;&#34;Masked Autoregressive flow for Density Estimation.
+
+    http://papers.nips.cc/paper/6828-masked-autoregressive-flow-for-density-estimation
+    &#34;&#34;&#34;
+        
+    def __init__(self, trnf, net=MADE_Net, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            dim (int): flow dimension.
+            h_dim (int): number of parameters per dimension.
+            net (nn.Module class): network to use for MADE. 
+                Must use `MaskedLinear` layers with appropriate masks. 
+                Defaults to `MADE_Net`.
+        &#34;&#34;&#34;
+
+        super().__init__(trnf, **kwargs)
+
+        self.net = net(self.dim, self.dim * trnf.h_dim, cond_dim=self.cond_dim)
+        
+
+    # Overrides:
+    def _h(self, x, cond=None, **kwargs):
+        return self.net(self._prepend_cond(x, cond))
+
+    def _invert(self, u, log_det=False, cond=None, **kwargs):
+        # Invert dimension per dimension sequentially
+        # We don&#39;t use gradients now; we&#39;ll do a gradient run right after
+        with torch.no_grad():
+            x = self._prepend_cond(torch.randn_like(u), cond)
+
+            for i in range(self.dim):
+                h_i = self.net(x) # obtain h_i from previously computed x
+                
+                x[:, [self.cond_dim + i]] = trnf(
+                    u[:, [i]], 
+                    h_i[:, self.h_dim * i : self.h_dim * (i + 1)], 
+                    invert=True, 
+                    log_det=False
+                )
+
+        # Run again, this time to get the gradient and log_det if required
+        h = self.net(x) # now we can compute for all dimensions
+        
+        return trnf(u, h, invert=True, log_det=log_det)
+
+# ------------------------------------------------------------------------------</code></pre>
 </details>
 </section>
 <section>
@@ -306,15 +483,6 @@ If None, defaults to <code><a title="flow.conditioner.ConditionerNet" href="#flo
 
     # Override methods
     def _h(self, x, cond=None, start=0):
-        if self.cond_dim &gt; 0:
-            if cond is None:
-                raise ValueError(&#39;cond can\&#39;t be None if cond_dim &gt; 0&#39;)
-            if cond.size(1) != self.cond_dim:
-                raise ValueError(
-                    f&#39;cond dim ({cond.size(1)}) &#39;
-                    &#39;doesn\&#39;t fit cond_dim ({self.cond_dim})&#39;
-                )
-
         assert 0 &lt;= start and start &lt;= min(self.dim - 1, x.size(1))
         x = self._prepend_cond(x, cond)
 
@@ -355,7 +523,7 @@ If None, defaults to <code><a title="flow.conditioner.ConditionerNet" href="#flo
 <li><code><a title="flow.flow.Conditioner.conditional" href="flow.html#flow.flow.Conditioner.conditional">conditional</a></code></li>
 <li><code><a title="flow.flow.Conditioner.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
 <li><code><a title="flow.flow.Conditioner.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
-<li><code><a title="flow.flow.Conditioner.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Conditioner.forward" href="flow.html#flow.flow.Conditioner.forward">forward</a></code></li>
 <li><code><a title="flow.flow.Conditioner.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
 <li><code><a title="flow.flow.Conditioner.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
 <li><code><a title="flow.flow.Conditioner.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
@@ -446,6 +614,313 @@ Total dimension of all parameters combined.</dd>
 </dd>
 </dl>
 </dd>
+<dt id="flow.conditioner.MADE"><code class="flex name class">
+<span>class <span class="ident">MADE</span></span>
+<span>(</span><span>trnf, net=flow.conditioner.MADE_Net, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Masked Autoregressive flow for Density Estimation.</p>
+<p><a href="http://papers.nips.cc/paper/6828-masked-autoregressive-flow-for-density-estimation">http://papers.nips.cc/paper/6828-masked-autoregressive-flow-for-density-estimation</a></p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>flow dimension.</dd>
+<dt><strong><code>h_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>number of parameters per dimension.</dd>
+<dt><strong><code>net</code></strong> :&ensp;<code>nn.Module class</code></dt>
+<dd>network to use for MADE.
+Must use <code><a title="flow.conditioner.MaskedLinear" href="#flow.conditioner.MaskedLinear">MaskedLinear</a></code> layers with appropriate masks.
+Defaults to <code><a title="flow.conditioner.MADE_Net" href="#flow.conditioner.MADE_Net">MADE_Net</a></code>.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MADE(Conditioner):
+    &#34;&#34;&#34;Masked Autoregressive flow for Density Estimation.
+
+    http://papers.nips.cc/paper/6828-masked-autoregressive-flow-for-density-estimation
+    &#34;&#34;&#34;
+        
+    def __init__(self, trnf, net=MADE_Net, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            dim (int): flow dimension.
+            h_dim (int): number of parameters per dimension.
+            net (nn.Module class): network to use for MADE. 
+                Must use `MaskedLinear` layers with appropriate masks. 
+                Defaults to `MADE_Net`.
+        &#34;&#34;&#34;
+
+        super().__init__(trnf, **kwargs)
+
+        self.net = net(self.dim, self.dim * trnf.h_dim, cond_dim=self.cond_dim)
+        
+
+    # Overrides:
+    def _h(self, x, cond=None, **kwargs):
+        return self.net(self._prepend_cond(x, cond))
+
+    def _invert(self, u, log_det=False, cond=None, **kwargs):
+        # Invert dimension per dimension sequentially
+        # We don&#39;t use gradients now; we&#39;ll do a gradient run right after
+        with torch.no_grad():
+            x = self._prepend_cond(torch.randn_like(u), cond)
+
+            for i in range(self.dim):
+                h_i = self.net(x) # obtain h_i from previously computed x
+                
+                x[:, [self.cond_dim + i]] = trnf(
+                    u[:, [i]], 
+                    h_i[:, self.h_dim * i : self.h_dim * (i + 1)], 
+                    invert=True, 
+                    log_det=False
+                )
+
+        # Run again, this time to get the gradient and log_det if required
+        h = self.net(x) # now we can compute for all dimensions
+        
+        return trnf(u, h, invert=True, log_det=log_det)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Conditioner" href="flow.html#flow.flow.Conditioner">Conditioner</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Conditioner" href="flow.html#flow.flow.Conditioner">Conditioner</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Conditioner.conditional" href="flow.html#flow.flow.Conditioner.conditional">conditional</a></code></li>
+<li><code><a title="flow.flow.Conditioner.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Conditioner.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Conditioner.forward" href="flow.html#flow.flow.Conditioner.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Conditioner.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Conditioner.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Conditioner.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Conditioner.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Conditioner.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="flow.conditioner.MADE_Net"><code class="flex name class">
+<span>class <span class="ident">MADE_Net</span></span>
+<span>(</span><span>input_dim, output_dim, hidden_sizes_mult=[10, 5], act=torch.nn.modules.activation.ReLU, cond_dim=0)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Feed-forward network with masked linear layers used for MADE.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>input_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>number of inputs (flow dimension).</dd>
+<dt><strong><code>output_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>number of outputs (trnf.dim * trnf.h_dim).
+Note that all parameters corresponding to a dimension
+are concatenated together. Therefore, for a 3D-affine trnf:
+mu0, sigma0, mu1, sigma1, mu2, sigma2. </dd>
+<dt><strong><code>hidden_sizes_mult</code></strong> :&ensp;<code>list</code></dt>
+<dd>multiplier w.r.t. input_size
+for each of the hidden layers.</dd>
+<dt><strong><code>act</code></strong> :&ensp;<code>nn.Module</code></dt>
+<dd>activation layer to use.
+If None, no activation is done.</dd>
+<dt><strong><code>cond_dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>dimensionality of the conditioning tensor, if any.
+non-negative int. If cond_dim &gt; 0, the cond tensor is expected
+to be concatenated before the input dimensions.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MADE_Net(nn.Sequential):
+    &#34;&#34;&#34;Feed-forward network with masked linear layers used for MADE.&#34;&#34;&#34;
+            
+    def __init__(
+        self, 
+        input_dim, output_dim, 
+        hidden_sizes_mult=[10, 5], act=nn.ReLU,
+        cond_dim=0
+    ):
+        &#34;&#34;&#34;
+        Args:
+            input_dim (int): number of inputs (flow dimension).
+            output_dim (int): number of outputs (trnf.dim * trnf.h_dim).
+                Note that all parameters corresponding to a dimension
+                are concatenated together. Therefore, for a 3D-affine trnf:
+                    mu0, sigma0, mu1, sigma1, mu2, sigma2. 
+            hidden_sizes_mult (list): multiplier w.r.t. input_size
+                for each of the hidden layers.
+            act (nn.Module): activation layer to use. 
+                If None, no activation is done.
+            cond_dim (int): dimensionality of the conditioning tensor, if any.
+                non-negative int. If cond_dim &gt; 0, the cond tensor is expected 
+                to be concatenated before the input dimensions.
+        &#34;&#34;&#34;
+
+        super().__init__()
+
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        assert not output_dim % input_dim
+        self.h_dim = output_dim // input_dim
+
+        assert all(isinstance(m, int) and m &gt;= 1 for m in hidden_sizes_mult)
+        self.hidden_sizes = [ 
+            (input_dim + (cond_dim &gt; 0)) * m 
+            for m in hidden_sizes_mult 
+        ]
+
+        assert isinstance(cond_dim, int) and cond_dim &gt;= 0
+        self.cond_dim = cond_dim
+
+        # Add all layers to the Sequential module
+        # Define mask connectivity
+        m = [ 
+            torch.arange(-cond_dim, input_dim) + 1
+        ] + [
+            (
+                torch.randperm(input_dim + (cond_dim &gt; 0)) + 
+                (cond_dim == 0)
+            ).repeat(m) # 0 means cond input, &gt; 0 are the actual inputs
+            for m in hidden_sizes_mult
+        ] + [ 
+            torch.arange(1, input_dim + 1)\
+                .view(-1, 1).repeat(1, self.h_dim).flatten()
+        ]
+
+        # Create the actual layers
+        for k, (m0, m1) in enumerate(zip(m[:-1], m[1:])):
+            # Define masks
+            h0, h1 = m0.size(0), m1.size(0)
+
+            # Check mask size
+            if k == 0:
+                assert h0 == input_dim + cond_dim
+            elif k &lt; len(self.hidden_sizes):
+                assert (h0, h1) == tuple(self.hidden_sizes[k-1:k+1]), \
+                    (h0, h1, self.hidden_sizes[k-1:k+1])
+            else:
+                assert h1 == output_dim
+
+            # Create mask
+            if k &lt; len(self.hidden_sizes):
+                mask = m1.unsqueeze(1) &gt;= m0.unsqueeze(0)
+            else:
+                mask = m1.unsqueeze(1) &gt; m0.unsqueeze(0)
+
+            # Add it to the masked layer
+            self.add_module(
+                &#39;masked_linear_%d&#39; % k,
+                MaskedLinear(h0, h1, bias=True, mask=mask)
+            )
+
+            # Add an activation if not the last layer
+            if act is not None and k &lt; len(m) - 2: # not the last one
+                self.add_module(f&#39;{act.__name__}_{k}&#39;, act())</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.container.Sequential</li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+</dd>
+<dt id="flow.conditioner.MaskedLinear"><code class="flex name class">
+<span>class <span class="ident">MaskedLinear</span></span>
+<span>(</span><span>in_features, out_features, bias=True, mask=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Extend <code>torch.nn.Linear</code> to use a boolean mask on its weights.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>in_features</code></strong> :&ensp;<code>int</code></dt>
+<dd>size of each input sample.</dd>
+<dt><strong><code>out_features</code></strong> :&ensp;<code>int</code></dt>
+<dd>size of each output sampl.</dd>
+<dt><strong><code>bias</code></strong> :&ensp;<code>bool</code></dt>
+<dd>If set to False,
+the layer will not learn an additive bias. </dd>
+<dt><strong><code>mask</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>boolean mask to apply to the weights.
+Tensor of shape (out_features, in_features).
+If None, defaults to an unmasked Linear layer.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class MaskedLinear(nn.Linear):
+    &#34;&#34;&#34;Extend `torch.nn.Linear` to use a boolean mask on its weights.&#34;&#34;&#34;
+
+    def __init__(self, in_features, out_features, bias=True, mask=None):
+        &#34;&#34;&#34;
+        Args:
+            in_features (int): size of each input sample.
+            out_features (int): size of each output sampl.
+            bias (bool): If set to False, 
+                the layer will not learn an additive bias. 
+            mask (torch.Tensor): boolean mask to apply to the weights.
+                Tensor of shape (out_features, in_features).
+                If None, defaults to an unmasked Linear layer.
+        &#34;&#34;&#34;
+        super().__init__(in_features, out_features, bias)
+        
+        if mask is None:
+            mask = torch.ones(out_features, in_features, dtype=bool)
+        else:
+            mask = mask.bool()
+
+        assert mask.shape == (out_features, in_features)
+        self.register_buffer(&#39;mask&#39;, mask)
+
+    def forward(self, input):
+        &#34;&#34;&#34;Extend forward to include the buffered mask.&#34;&#34;&#34;
+        return F.linear(input, self.mask * self.weight, self.bias)
+
+    def set_mask(self, mask):
+        &#34;&#34;&#34;Set the buffered mask to the given tensor.&#34;&#34;&#34;
+        self.mask.data = mask</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>torch.nn.modules.linear.Linear</li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="flow.conditioner.MaskedLinear.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, input)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Extend forward to include the buffered mask.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, input):
+    &#34;&#34;&#34;Extend forward to include the buffered mask.&#34;&#34;&#34;
+    return F.linear(input, self.mask * self.weight, self.bias)</code></pre>
+</details>
+</dd>
+<dt id="flow.conditioner.MaskedLinear.set_mask"><code class="name flex">
+<span>def <span class="ident">set_mask</span></span>(<span>self, mask)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Set the buffered mask to the given tensor.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_mask(self, mask):
+    &#34;&#34;&#34;Set the buffered mask to the given tensor.&#34;&#34;&#34;
+    self.mask.data = mask</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
 </dl>
 </section>
 </article>
@@ -474,6 +949,19 @@ Total dimension of all parameters combined.</dd>
 <h4><code><a title="flow.conditioner.ConditionerNet" href="#flow.conditioner.ConditionerNet">ConditionerNet</a></code></h4>
 <ul class="">
 <li><code><a title="flow.conditioner.ConditionerNet.forward" href="#flow.conditioner.ConditionerNet.forward">forward</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="flow.conditioner.MADE" href="#flow.conditioner.MADE">MADE</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.conditioner.MADE_Net" href="#flow.conditioner.MADE_Net">MADE_Net</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.conditioner.MaskedLinear" href="#flow.conditioner.MaskedLinear">MaskedLinear</a></code></h4>
+<ul class="">
+<li><code><a title="flow.conditioner.MaskedLinear.forward" href="#flow.conditioner.MaskedLinear.forward">forward</a></code></li>
+<li><code><a title="flow.conditioner.MaskedLinear.set_mask" href="#flow.conditioner.MaskedLinear.set_mask">set_mask</a></code></li>
 </ul>
 </li>
 </ul>

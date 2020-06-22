@@ -407,7 +407,7 @@ class Conditioner(Flow):
         self.cond_dim = cond_dim
 
         # not conditional -&gt; cond_dim == 0
-        if not self.conditional and cond_dim &gt; 0:
+        if not self.conditional and cond_dim:
             raise ValueError(
                 &#39;This Conditioner is non-conditional, &#39;
                 &#39;so cond_dim needs to be 0.&#39;
@@ -415,15 +415,23 @@ class Conditioner(Flow):
 
 
     # Method overrides
-    def _transform(self, x, log_det=False, cond=None, **kwargs):
-        if self.cond_dim and cond is None:
-            raise ValueError(&#39;cond is None but cond_dim &gt; 0&#39;)
-        if self.cond_dim and cond.size(1) != self.cond_dim:
-            raise ValueError(
-                f&#39;Invalid cond dim {cond.size(1)}; expected {self.cond_dim}&#39;
-            )
+    def forward(self, *args, cond=None, **kwargs):
+        &#34;&#34;&#34;Extend forward to include cond attribute, for conditional flows.&#34;&#34;&#34;
+        if self.conditional and self.cond_dim:
+            if cond is None:
+                raise ValueError(&#39;cond is None but cond_dim &gt; 0&#39;)
+            elif cond.size(1) != self.cond_dim:
+                raise ValueError(
+                    f&#39;Invalid cond dim {cond.size(1)}; expected {self.cond_dim}&#39;
+                )
+        elif cond is not None:
+            raise ValueError(&#39;Passing cond != None to non-conditional flow&#39;)
 
+        super().forward(*args, cond=cond, **kwargs)
+
+    def _transform(self, x, log_det=False, cond=None, **kwargs):
         h = self._h(x, cond=cond, **kwargs)
+        
         return self.trnf(x, h, log_det=log_det, **kwargs)
 
     # Extend warm_start to also call trnf.warm_start
@@ -720,7 +728,7 @@ this is the dimension of the conditioning tensor.</dd>
         self.cond_dim = cond_dim
 
         # not conditional -&gt; cond_dim == 0
-        if not self.conditional and cond_dim &gt; 0:
+        if not self.conditional and cond_dim:
             raise ValueError(
                 &#39;This Conditioner is non-conditional, &#39;
                 &#39;so cond_dim needs to be 0.&#39;
@@ -728,15 +736,23 @@ this is the dimension of the conditioning tensor.</dd>
 
 
     # Method overrides
-    def _transform(self, x, log_det=False, cond=None, **kwargs):
-        if self.cond_dim and cond is None:
-            raise ValueError(&#39;cond is None but cond_dim &gt; 0&#39;)
-        if self.cond_dim and cond.size(1) != self.cond_dim:
-            raise ValueError(
-                f&#39;Invalid cond dim {cond.size(1)}; expected {self.cond_dim}&#39;
-            )
+    def forward(self, *args, cond=None, **kwargs):
+        &#34;&#34;&#34;Extend forward to include cond attribute, for conditional flows.&#34;&#34;&#34;
+        if self.conditional and self.cond_dim:
+            if cond is None:
+                raise ValueError(&#39;cond is None but cond_dim &gt; 0&#39;)
+            elif cond.size(1) != self.cond_dim:
+                raise ValueError(
+                    f&#39;Invalid cond dim {cond.size(1)}; expected {self.cond_dim}&#39;
+                )
+        elif cond is not None:
+            raise ValueError(&#39;Passing cond != None to non-conditional flow&#39;)
 
+        super().forward(*args, cond=cond, **kwargs)
+
+    def _transform(self, x, log_det=False, cond=None, **kwargs):
         h = self._h(x, cond=cond, **kwargs)
+        
         return self.trnf(x, h, log_det=log_det, **kwargs)
 
     # Extend warm_start to also call trnf.warm_start
@@ -788,6 +804,7 @@ this is the dimension of the conditioning tensor.</dd>
 <h3>Subclasses</h3>
 <ul class="hlist">
 <li><a title="flow.conditioner.AutoregressiveNaive" href="conditioner.html#flow.conditioner.AutoregressiveNaive">AutoregressiveNaive</a></li>
+<li><a title="flow.conditioner.MADE" href="conditioner.html#flow.conditioner.MADE">MADE</a></li>
 </ul>
 <h3>Class variables</h3>
 <dl>
@@ -796,13 +813,39 @@ this is the dimension of the conditioning tensor.</dd>
 <div class="desc"><p>Whether this class can model conditional distributions (cond_dim &gt; 0).</p></div>
 </dd>
 </dl>
+<h3>Methods</h3>
+<dl>
+<dt id="flow.flow.Conditioner.forward"><code class="name flex">
+<span>def <span class="ident">forward</span></span>(<span>self, *args, cond=None, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Extend forward to include cond attribute, for conditional flows.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def forward(self, *args, cond=None, **kwargs):
+    &#34;&#34;&#34;Extend forward to include cond attribute, for conditional flows.&#34;&#34;&#34;
+    if self.conditional and self.cond_dim:
+        if cond is None:
+            raise ValueError(&#39;cond is None but cond_dim &gt; 0&#39;)
+        elif cond.size(1) != self.cond_dim:
+            raise ValueError(
+                f&#39;Invalid cond dim {cond.size(1)}; expected {self.cond_dim}&#39;
+            )
+    elif cond is not None:
+        raise ValueError(&#39;Passing cond != None to non-conditional flow&#39;)
+
+    super().forward(*args, cond=cond, **kwargs)</code></pre>
+</details>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="flow.flow.Flow" href="#flow.flow.Flow">Flow</a></b></code>:
 <ul class="hlist">
 <li><code><a title="flow.flow.Flow.cpu" href="#flow.flow.Flow.cpu">cpu</a></code></li>
 <li><code><a title="flow.flow.Flow.cuda" href="#flow.flow.Flow.cuda">cuda</a></code></li>
-<li><code><a title="flow.flow.Flow.forward" href="#flow.flow.Flow.forward">forward</a></code></li>
 <li><code><a title="flow.flow.Flow.nll" href="#flow.flow.Flow.nll">nll</a></code></li>
 <li><code><a title="flow.flow.Flow.reverse_kl" href="#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
 <li><code><a title="flow.flow.Flow.sample" href="#flow.flow.Flow.sample">sample</a></code></li>
@@ -1685,6 +1728,7 @@ where T is the applied transformation.</dd>
 <h4><code><a title="flow.flow.Conditioner" href="#flow.flow.Conditioner">Conditioner</a></code></h4>
 <ul class="">
 <li><code><a title="flow.flow.Conditioner.conditional" href="#flow.flow.Conditioner.conditional">conditional</a></code></li>
+<li><code><a title="flow.flow.Conditioner.forward" href="#flow.flow.Conditioner.forward">forward</a></code></li>
 </ul>
 </li>
 <li>

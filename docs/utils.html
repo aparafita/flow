@@ -37,17 +37,6 @@ import torch
 import torch.nn.functional as F
 
 
-def no_grad_dec(func):
-    &#34;&#34;&#34;Decorate a function to avoid computing grads.&#34;&#34;&#34;
-
-    @wraps(func)
-    def f(*args, **kwargs):
-        with torch.no_grad():
-            return func(*args, **kwargs)
-
-    return f
-
-
 def log_sum_exp_trick(x, log_w=None, dim=-1, keepdim=False):
     &#34;&#34;&#34;Compute log(sum(w * exp(x), dim=dim, keepdim=keepdim)) safely.
 
@@ -93,7 +82,7 @@ def softplus_inv(x, eps=1e-6, threshold=20.):
 logsigmoid = lambda x, alpha=1., **kwargs: -softplus(-alpha * x, **kwargs)
 
 
-@no_grad_dec
+@torch.no_grad()
 def monotonic_increasing_bounded_bijective_search(
     f, x, *args, a=0., b=1., eps=1e-3, **kwargs
 ):
@@ -116,7 +105,7 @@ def monotonic_increasing_bounded_bijective_search(
     return u
 
 
-@no_grad_dec
+@torch.no_grad()
 def monotonic_increasing_bijective_search(
     f, x, *args, a=-np.inf, b=np.inf, eps=1e-3, max_steps=100, **kwargs
 ):
@@ -239,7 +228,7 @@ def monotonic_increasing_bijective_search(
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@no_grad_dec
+<pre><code class="python">@torch.no_grad()
 def monotonic_increasing_bijective_search(
     f, x, *args, a=-np.inf, b=np.inf, eps=1e-3, max_steps=100, **kwargs
 ):
@@ -294,7 +283,7 @@ def monotonic_increasing_bijective_search(
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">@no_grad_dec
+<pre><code class="python">@torch.no_grad()
 def monotonic_increasing_bounded_bijective_search(
     f, x, *args, a=0., b=1., eps=1e-3, **kwargs
 ):
@@ -315,26 +304,6 @@ def monotonic_increasing_bounded_bijective_search(
         diff = (fu - x).abs().mean()
 
     return u</code></pre>
-</details>
-</dd>
-<dt id="flow.utils.no_grad_dec"><code class="name flex">
-<span>def <span class="ident">no_grad_dec</span></span>(<span>func)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Decorate a function to avoid computing grads.</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def no_grad_dec(func):
-    &#34;&#34;&#34;Decorate a function to avoid computing grads.&#34;&#34;&#34;
-
-    @wraps(func)
-    def f(*args, **kwargs):
-        with torch.no_grad():
-            return func(*args, **kwargs)
-
-    return f</code></pre>
 </details>
 </dd>
 <dt id="flow.utils.softplus"><code class="name flex">
@@ -393,7 +362,6 @@ def monotonic_increasing_bounded_bijective_search(
 <li><code><a title="flow.utils.logsigmoid" href="#flow.utils.logsigmoid">logsigmoid</a></code></li>
 <li><code><a title="flow.utils.monotonic_increasing_bijective_search" href="#flow.utils.monotonic_increasing_bijective_search">monotonic_increasing_bijective_search</a></code></li>
 <li><code><a title="flow.utils.monotonic_increasing_bounded_bijective_search" href="#flow.utils.monotonic_increasing_bounded_bijective_search">monotonic_increasing_bounded_bijective_search</a></code></li>
-<li><code><a title="flow.utils.no_grad_dec" href="#flow.utils.no_grad_dec">no_grad_dec</a></code></li>
 <li><code><a title="flow.utils.softplus" href="#flow.utils.softplus">softplus</a></code></li>
 <li><code><a title="flow.utils.softplus_inv" href="#flow.utils.softplus_inv">softplus_inv</a></code></li>
 </ul>

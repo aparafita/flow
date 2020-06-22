@@ -1,5 +1,11 @@
 """
 Implementations for Flow-Conditioners.
+
+Conditioners implemented in this class:
+
+* `AutoregressiveNaive`: conditioner defined by a separate network 
+    for each dimension. Only use for one-dimensional flows.
+* `MADE`: Masked Autoregressive flow for Density Estimation.
 """
 
 import numpy as np
@@ -174,9 +180,11 @@ class MaskedLinear(nn.Linear):
         self.register_buffer('mask', mask)
 
     def forward(self, input):
+        """Extend forward to include the buffered mask."""
         return F.linear(input, self.mask * self.weight, self.bias)
 
     def set_mask(self, mask):
+        """Set the buffered mask to the given tensor."""
         self.mask.data = mask
 
 
@@ -280,7 +288,8 @@ class MADE(Conditioner):
             dim (int): flow dimension.
             h_dim (int): number of parameters per dimension.
             net (nn.Module class): network to use for MADE. 
-                Must use `MaskedLinear` layers. Defaults to `MADE_Net`.
+                Must use `MaskedLinear` layers with appropriate masks. 
+                Defaults to `MADE_Net`.
         """
 
         super().__init__(trnf, **kwargs)
