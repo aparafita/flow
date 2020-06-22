@@ -9,7 +9,7 @@ import torch
 
 from flow.transformer import Affine, NonAffine, DSF
 
-from utils import torch_eq_float, skip_cuda, no_grad_dec
+from utils import torch_eq_float, skip_cuda
 
 
 # Fill this list with all conditioners you want to test.
@@ -21,7 +21,7 @@ test_transformers = [
 
 
 @pytest.mark.parametrize('trnf', test_transformers)
-@no_grad_dec
+@torch.no_grad()
 def test_shape_and_return_requirements(trnf, dim=2):    
     trnf = trnf(dim=dim)
 

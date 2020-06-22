@@ -6,8 +6,6 @@ import pytest
 
 import torch
 
-from flow.utils import no_grad_dec
-
 
 def torch_eq_float(x, y, eps=1e-3):
     """Compare all entries in x and y for equality, up to eps differences."""

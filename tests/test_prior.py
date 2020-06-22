@@ -9,7 +9,7 @@ import torch
 
 from flow.prior import Normal
 
-from utils import skip_cuda, no_grad_dec
+from utils import skip_cuda
 
 
 # Fill this list with all priors you want to test.
@@ -19,7 +19,7 @@ test_priors = [
 
 
 @pytest.mark.parametrize('prior', test_priors)
-@no_grad_dec
+@torch.no_grad()
 def test_prior(prior, dim=2):
     prior = prior(dim=dim)
 
@@ -32,7 +32,7 @@ def test_prior(prior, dim=2):
 
 @pytest.mark.parametrize('prior', test_priors)
 @skip_cuda
-@no_grad_dec
+@torch.no_grad()
 def test_prior_device(prior, dim=2):
     prior = prior(dim=dim)
 

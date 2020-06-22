@@ -9,7 +9,7 @@ import torch
 from flow.conditioner import AutoregressiveNaive, MADE
 from flow.transformer import Affine
 
-from utils import torch_eq_float, skip_cuda, no_grad_dec
+from utils import torch_eq_float, skip_cuda
 
 
 # Fill this list with all conditioners you want to test.
@@ -32,7 +32,7 @@ def test_device(cond, dim=2):
 
 
 @pytest.mark.parametrize('cond', test_conditioners)
-@no_grad_dec
+@torch.no_grad()
 def test_h_shape(cond, dim=2):
     """Test that _h returns the correct parameters shape."""
     flow = cond(Affine(dim=dim), dim=dim)
@@ -44,7 +44,7 @@ def test_h_shape(cond, dim=2):
 
 
 @pytest.mark.parametrize('cond', test_conditioners)
-@no_grad_dec
+@torch.no_grad()
 def test_conditional(cond, dim=2, cond_dim=3, seed=123):
     """Test that conditional Conditioner works correctly."""
     assert cond_dim > 0, 'Don\'t call this test with cond_dim <= 0'

@@ -13,10 +13,10 @@ from torch import nn
 from flow.flow import Flow, inv_flow, Sequential
 from flow.modules import Affine as AffineFlow
 
-from utils import torch_eq_float, skip_cuda, no_grad_dec
+from utils import torch_eq_float, skip_cuda
 
 
-@no_grad_dec
+@torch.no_grad()
 def test_flow_affine():
     """Test if Flow inheritance requirements are preserved.
 
@@ -43,7 +43,7 @@ def test_flow_affine():
     assert torch_eq_float(flow.nll(x), expected_nll) # pass nll
 
 
-@no_grad_dec
+@torch.no_grad()
 def test_inv_flow():
     """Test if inv_flow inverts a Flow class."""
     weight = torch.ones(1, 1) * 2
@@ -60,7 +60,7 @@ def test_inv_flow():
     assert torch_eq_float(u, u2)
 
 
-@no_grad_dec
+@torch.no_grad()
 def test_sequential():
     """Test all operations of a Sequential"""
     flows = [

@@ -9,17 +9,6 @@ import torch
 import torch.nn.functional as F
 
 
-def no_grad_dec(func):
-    """Decorate a function to avoid computing grads."""
-
-    @wraps(func)
-    def f(*args, **kwargs):
-        with torch.no_grad():
-            return func(*args, **kwargs)
-
-    return f
-
-
 def log_sum_exp_trick(x, log_w=None, dim=-1, keepdim=False):
     """Compute log(sum(w * exp(x), dim=dim, keepdim=keepdim)) safely.
 
@@ -65,7 +54,7 @@ def softplus_inv(x, eps=1e-6, threshold=20.):
 logsigmoid = lambda x, alpha=1., **kwargs: -softplus(-alpha * x, **kwargs)
 
 
-@no_grad_dec
+@torch.no_grad()
 def monotonic_increasing_bounded_bijective_search(
     f, x, *args, a=0., b=1., eps=1e-3, **kwargs
 ):
@@ -88,7 +77,7 @@ def monotonic_increasing_bounded_bijective_search(
     return u
 
 
-@no_grad_dec
+@torch.no_grad()
 def monotonic_increasing_bijective_search(
     f, x, *args, a=-np.inf, b=np.inf, eps=1e-3, max_steps=100, **kwargs
 ):
