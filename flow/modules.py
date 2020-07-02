@@ -70,29 +70,32 @@ class Affine(Flow):
 class Sigmoid(Flow):
     """Sigmoid Flow."""
 
-    def __init__(self, alpha=1., **kwargs):
+    def __init__(self, alpha=1., eps=1e-2, **kwargs):
         r"""
         Args:
             alpha (float): alpha parameter for the sigmoid function: 
                 \(s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}\).
                 Must be bigger than 0.
+            eps (float): transformed values will be clamped to (eps, 1 - eps) 
+                on both _transform and _invert.
         """
         super().__init__(**kwargs)
 
         self.alpha = alpha
+        self.eps = eps
 
     def _log_det(self, x):
         """Return log|det J_T|, where T: x -> u."""
-
         return (
             np.log(self.alpha) + 
-            2 * logsigmoid(x, alpha=alpha) +
+            2 * logsigmoid(x, alpha=self.alpha) +
             -self.alpha * x
         ).sum(dim=1)
 
     # Override methods
     def _transform(self, x, log_det=False, **kwargs):
         u = torch.sigmoid(self.alpha * x)
+        u = u.clamp(self.eps, 1 - self.eps)
 
         if log_det:
             return u, self._log_det(x)
@@ -100,6 +103,7 @@ class Sigmoid(Flow):
             return u
 
     def _invert(self, u, log_det=False, **kwargs):
+        u = u.clamp(self.eps, 1 - self.eps)
         x = -torch.log(1 / self.alpha / u - 1)
 
         if log_det:
@@ -160,7 +164,7 @@ class LogSigmoid(Flow):
     def _log_det(self, x):
         """Return log|det J_T|, where T: x -> u."""
 
-        return logsigmoid(-self.alpha * x) + np.log(self.alpha)
+        return logsigmoid(-self.alpha * x).sum(dim=1) + np.log(self.alpha)
 
     # Override methods
     def _transform(self, x, log_det=False, **kwargs):
@@ -197,7 +201,7 @@ class LeakyReLU(Flow):
             x >= 0, 
             torch.zeros_like(x), 
             torch.ones_like(x) * np.log(self.negative_slope)
-        )
+        ).sum(dim=1)
 
 
     # Override methods
@@ -249,6 +253,9 @@ class BatchNorm(Flow):
         self.scale = nn.Parameter(torch.zeros(1, self.dim))
 
     def _update(self, x):
+        assert not self.training or x.size(0) >= 2, \
+            'If training BatchNorm, pass more than 1 sample.'
+
         with torch.no_grad():
             bloc = x.mean(0, keepdim=True)
             bscale = x.std(0, keepdim=True) + self.eps
@@ -287,7 +294,7 @@ class BatchNorm(Flow):
 
     def _transform(self, x, log_det=False, **kwargs):
         bloc, bscale, loc, scale = self._activation(x, update=self.training)
-        u = scale * ((x - bloc) / bscale) + loc
+        u = scale * (x - bloc) / bscale + loc
         
         if log_det:
             log_det = self._log_det(scale, bscale)
