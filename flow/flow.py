@@ -135,6 +135,7 @@ class Flow(nn.Module):
         assert self.prior is not None
 
         u, log_det = self(x, **kwargs, log_det=True)
+        assert len(log_det.shape) == 1
 
         return self.prior.nll(u) - log_det
 
@@ -154,7 +155,9 @@ class Flow(nn.Module):
         u = self.prior.sample(n)
         loglk_u = -self.prior.nll(u)
 
-        x, log_det = self._invert(u, log_det=True, **kwargs)
+        x, log_det = self(u, log_det=True, invert=True, **kwargs)
+        assert len(log_det.shape) == 1
+
         loglk_x = -nll_x(x, **kwargs)
 
         return loglk_u - log_det - loglk_x
@@ -197,8 +200,8 @@ def inv_flow(flow_cls, name=None):
     class InvFlow(flow_cls):
 
         # Extend forward to swap _transform and _invert
-        def forward(self, t, invert=False, **kwargs):
-            return super().forward(t, invert=not invert, **kwargs)
+        def forward(self, *args, invert=False, **kwargs):
+            return super().forward(*args, invert=not invert, **kwargs)
 
     InvFlow.__name__ = name
     InvFlow.__doc__ = (
@@ -236,13 +239,15 @@ class Sequential(Flow):
 
     # Method overrides
     def _transform(self, x, log_det=False, **kwargs):
-        log_det_sum = 0.
+        log_det_sum = torch.zeros(1, device=x.device)
         
         for flow in self.flows:
             res = flow(x, log_det=log_det, **kwargs)
 
             if log_det:
                 x, log_det_i = res
+                assert len(log_det_i.shape) == 1
+
                 log_det_sum = log_det_sum + log_det_i
             else:
                 x = res
@@ -253,13 +258,15 @@ class Sequential(Flow):
             return x
 
     def _invert(self, u, log_det=False, **kwargs):
-        log_det_sum = 0.
+        log_det_sum = torch.zeros(1, device=u.device)
 
         for flow in reversed(self.flows):
             res = flow(u, invert=True, log_det=log_det, **kwargs)
 
             if log_det:
                 u, log_det_i = res
+                assert len(log_det_i.shape) == 1
+
                 log_det_sum = log_det_sum + log_det_i
             else:
                 u = res
@@ -387,7 +394,7 @@ class Conditioner(Flow):
         elif cond is not None:
             raise ValueError('Passing cond != None to non-conditional flow')
 
-        super().forward(*args, cond=cond, **kwargs)
+        return super().forward(*args, cond=cond, **kwargs)
 
     def _transform(self, x, log_det=False, cond=None, **kwargs):
         h = self._h(x, cond=cond, **kwargs)
