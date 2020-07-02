@@ -98,29 +98,32 @@ class Affine(Flow):
 class Sigmoid(Flow):
     &#34;&#34;&#34;Sigmoid Flow.&#34;&#34;&#34;
 
-    def __init__(self, alpha=1., **kwargs):
+    def __init__(self, alpha=1., eps=1e-2, **kwargs):
         r&#34;&#34;&#34;
         Args:
             alpha (float): alpha parameter for the sigmoid function: 
                 \(s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}\).
                 Must be bigger than 0.
+            eps (float): transformed values will be clamped to (eps, 1 - eps) 
+                on both _transform and _invert.
         &#34;&#34;&#34;
         super().__init__(**kwargs)
 
         self.alpha = alpha
+        self.eps = eps
 
     def _log_det(self, x):
         &#34;&#34;&#34;Return log|det J_T|, where T: x -&gt; u.&#34;&#34;&#34;
-
         return (
             np.log(self.alpha) + 
-            2 * logsigmoid(x, alpha=alpha) +
+            2 * logsigmoid(x, alpha=self.alpha) +
             -self.alpha * x
         ).sum(dim=1)
 
     # Override methods
     def _transform(self, x, log_det=False, **kwargs):
         u = torch.sigmoid(self.alpha * x)
+        u = u.clamp(self.eps, 1 - self.eps)
 
         if log_det:
             return u, self._log_det(x)
@@ -128,6 +131,7 @@ class Sigmoid(Flow):
             return u
 
     def _invert(self, u, log_det=False, **kwargs):
+        u = u.clamp(self.eps, 1 - self.eps)
         x = -torch.log(1 / self.alpha / u - 1)
 
         if log_det:
@@ -188,7 +192,7 @@ class LogSigmoid(Flow):
     def _log_det(self, x):
         &#34;&#34;&#34;Return log|det J_T|, where T: x -&gt; u.&#34;&#34;&#34;
 
-        return logsigmoid(-self.alpha * x) + np.log(self.alpha)
+        return logsigmoid(-self.alpha * x).sum(dim=1) + np.log(self.alpha)
 
     # Override methods
     def _transform(self, x, log_det=False, **kwargs):
@@ -225,7 +229,7 @@ class LeakyReLU(Flow):
             x &gt;= 0, 
             torch.zeros_like(x), 
             torch.ones_like(x) * np.log(self.negative_slope)
-        )
+        ).sum(dim=1)
 
 
     # Override methods
@@ -277,6 +281,9 @@ class BatchNorm(Flow):
         self.scale = nn.Parameter(torch.zeros(1, self.dim))
 
     def _update(self, x):
+        assert not self.training or x.size(0) &gt;= 2, \
+            &#39;If training BatchNorm, pass more than 1 sample.&#39;
+
         with torch.no_grad():
             bloc = x.mean(0, keepdim=True)
             bscale = x.std(0, keepdim=True) + self.eps
@@ -315,7 +322,7 @@ class BatchNorm(Flow):
 
     def _transform(self, x, log_det=False, **kwargs):
         bloc, bscale, loc, scale = self._activation(x, update=self.training)
-        u = scale * ((x - bloc) / bscale) + loc
+        u = scale * (x - bloc) / bscale + loc
         
         if log_det:
             log_det = self._log_det(scale, bscale)
@@ -493,6 +500,9 @@ of batch statistics. Must be between 0 and 1.</dd>
         self.scale = nn.Parameter(torch.zeros(1, self.dim))
 
     def _update(self, x):
+        assert not self.training or x.size(0) &gt;= 2, \
+            &#39;If training BatchNorm, pass more than 1 sample.&#39;
+
         with torch.no_grad():
             bloc = x.mean(0, keepdim=True)
             bscale = x.std(0, keepdim=True) + self.eps
@@ -531,7 +541,7 @@ of batch statistics. Must be between 0 and 1.</dd>
 
     def _transform(self, x, log_det=False, **kwargs):
         bloc, bscale, loc, scale = self._activation(x, update=self.training)
-        u = scale * ((x - bloc) / bscale) + loc
+        u = scale * (x - bloc) / bscale + loc
         
         if log_det:
             log_det = self._log_det(scale, bscale)
@@ -602,7 +612,7 @@ of batch statistics. Must be between 0 and 1.</dd>
             x &gt;= 0, 
             torch.zeros_like(x), 
             torch.ones_like(x) * np.log(self.negative_slope)
-        )
+        ).sum(dim=1)
 
 
     # Override methods
@@ -673,7 +683,7 @@ of batch statistics. Must be between 0 and 1.</dd>
     def _log_det(self, x):
         &#34;&#34;&#34;Return log|det J_T|, where T: x -&gt; u.&#34;&#34;&#34;
 
-        return logsigmoid(-self.alpha * x) + np.log(self.alpha)
+        return logsigmoid(-self.alpha * x).sum(dim=1) + np.log(self.alpha)
 
     # Override methods
     def _transform(self, x, log_det=False, **kwargs):
@@ -715,7 +725,7 @@ of batch statistics. Must be between 0 and 1.</dd>
 </dd>
 <dt id="flow.modules.Sigmoid"><code class="flex name class">
 <span>class <span class="ident">Sigmoid</span></span>
-<span>(</span><span>alpha=1.0, **kwargs)</span>
+<span>(</span><span>alpha=1.0, eps=0.01, **kwargs)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Sigmoid Flow.</p>
@@ -725,6 +735,9 @@ of batch statistics. Must be between 0 and 1.</dd>
 <dd>alpha parameter for the sigmoid function:
 <span><span class="MathJax_Preview">s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}</span><script type="math/tex">s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}</script></span>.
 Must be bigger than 0.</dd>
+<dt><strong><code>eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>transformed values will be clamped to (eps, 1 - eps)
+on both _transform and _invert.</dd>
 </dl></div>
 <details class="source">
 <summary>
@@ -733,29 +746,32 @@ Must be bigger than 0.</dd>
 <pre><code class="python">class Sigmoid(Flow):
     &#34;&#34;&#34;Sigmoid Flow.&#34;&#34;&#34;
 
-    def __init__(self, alpha=1., **kwargs):
+    def __init__(self, alpha=1., eps=1e-2, **kwargs):
         r&#34;&#34;&#34;
         Args:
             alpha (float): alpha parameter for the sigmoid function: 
                 \(s(x, \alpha) = \frac{1}{1 + e^{-\alpha x}}\).
                 Must be bigger than 0.
+            eps (float): transformed values will be clamped to (eps, 1 - eps) 
+                on both _transform and _invert.
         &#34;&#34;&#34;
         super().__init__(**kwargs)
 
         self.alpha = alpha
+        self.eps = eps
 
     def _log_det(self, x):
         &#34;&#34;&#34;Return log|det J_T|, where T: x -&gt; u.&#34;&#34;&#34;
-
         return (
             np.log(self.alpha) + 
-            2 * logsigmoid(x, alpha=alpha) +
+            2 * logsigmoid(x, alpha=self.alpha) +
             -self.alpha * x
         ).sum(dim=1)
 
     # Override methods
     def _transform(self, x, log_det=False, **kwargs):
         u = torch.sigmoid(self.alpha * x)
+        u = u.clamp(self.eps, 1 - self.eps)
 
         if log_det:
             return u, self._log_det(x)
@@ -763,6 +779,7 @@ Must be bigger than 0.</dd>
             return u
 
     def _invert(self, u, log_det=False, **kwargs):
+        u = u.clamp(self.eps, 1 - self.eps)
         x = -torch.log(1 / self.alpha / u - 1)
 
         if log_det:

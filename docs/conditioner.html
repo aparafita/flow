@@ -86,15 +86,18 @@ def default_net(
             else:
                 return activation()
 
-    return nn.Sequential(*(
-        layer
-        for layer in (
-            create_layer(n_layer, n_step)
-            for n_layer in range(n_layers)
-            for n_step in range(2)
+    return nn.Sequential(
+        nn.BatchNorm1d(input_dim, affine=False),
+        *(
+            layer
+            for layer in (
+                create_layer(n_layer, n_step)
+                for n_layer in range(n_layers)
+                for n_step in range(2)
+            )
+            if layer is not None
         )
-        if layer is not None
-    ))
+    )
 
 
 class ConditionerNet(nn.Module):
@@ -142,6 +145,8 @@ class AutoregressiveNaive(Conditioner):
     def __init__(self, trnf, net=None, **kwargs):
         &#34;&#34;&#34;
         Args:
+            trnf (flow.flow.Transformer): 
+                transformer to use alongside this conditioner.
             net (class): torch.nn.Module class that computes the parameters.
                 If None, defaults to `ConditionerNet` with `default_net`.
         &#34;&#34;&#34;
@@ -319,8 +324,8 @@ class MADE(Conditioner):
     def __init__(self, trnf, net=MADE_Net, **kwargs):
         &#34;&#34;&#34;
         Args:
-            dim (int): flow dimension.
-            h_dim (int): number of parameters per dimension.
+            trnf (flow.flow.Transformer): 
+                transformer to use alongside this conditioner.
             net (nn.Module class): network to use for MADE. 
                 Must use `MaskedLinear` layers with appropriate masks. 
                 Defaults to `MADE_Net`.
@@ -344,9 +349,9 @@ class MADE(Conditioner):
             for i in range(self.dim):
                 h_i = self.net(x) # obtain h_i from previously computed x
                 
-                x[:, [self.cond_dim + i]] = trnf(
+                x[:, [self.cond_dim + i]] = self.trnf(
                     u[:, [i]], 
-                    h_i[:, self.h_dim * i : self.h_dim * (i + 1)], 
+                    h_i[:, self.trnf.h_dim * i : self.trnf.h_dim * (i + 1)], 
                     invert=True, 
                     log_det=False
                 )
@@ -354,7 +359,7 @@ class MADE(Conditioner):
         # Run again, this time to get the gradient and log_det if required
         h = self.net(x) # now we can compute for all dimensions
         
-        return trnf(u, h, invert=True, log_det=log_det)
+        return self.trnf(u, h, invert=True, log_det=log_det)
 
 # ------------------------------------------------------------------------------</code></pre>
 </details>
@@ -426,15 +431,18 @@ as activation layer after each linear layer.</dd>
             else:
                 return activation()
 
-    return nn.Sequential(*(
-        layer
-        for layer in (
-            create_layer(n_layer, n_step)
-            for n_layer in range(n_layers)
-            for n_step in range(2)
+    return nn.Sequential(
+        nn.BatchNorm1d(input_dim, affine=False),
+        *(
+            layer
+            for layer in (
+                create_layer(n_layer, n_step)
+                for n_layer in range(n_layers)
+                for n_step in range(2)
+            )
+            if layer is not None
         )
-        if layer is not None
-    ))</code></pre>
+    )</code></pre>
 </details>
 </dd>
 </dl>
@@ -451,6 +459,8 @@ as activation layer after each linear layer.</dd>
 <p>Implements a separate network for each dimension's h parameters.</p>
 <h2 id="args">Args</h2>
 <dl>
+<dt><strong><code>trnf</code></strong> :&ensp;<code><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></code></dt>
+<dd>transformer to use alongside this conditioner.</dd>
 <dt><strong><code>net</code></strong> :&ensp;<code>class</code></dt>
 <dd>torch.nn.Module class that computes the parameters.
 If None, defaults to <code><a title="flow.conditioner.ConditionerNet" href="#flow.conditioner.ConditionerNet">ConditionerNet</a></code> with <code><a title="flow.conditioner.default_net" href="#flow.conditioner.default_net">default_net()</a></code>.</dd>
@@ -468,6 +478,8 @@ If None, defaults to <code><a title="flow.conditioner.ConditionerNet" href="#flo
     def __init__(self, trnf, net=None, **kwargs):
         &#34;&#34;&#34;
         Args:
+            trnf (flow.flow.Transformer): 
+                transformer to use alongside this conditioner.
             net (class): torch.nn.Module class that computes the parameters.
                 If None, defaults to `ConditionerNet` with `default_net`.
         &#34;&#34;&#34;
@@ -623,10 +635,8 @@ Total dimension of all parameters combined.</dd>
 <p><a href="http://papers.nips.cc/paper/6828-masked-autoregressive-flow-for-density-estimation">http://papers.nips.cc/paper/6828-masked-autoregressive-flow-for-density-estimation</a></p>
 <h2 id="args">Args</h2>
 <dl>
-<dt><strong><code>dim</code></strong> :&ensp;<code>int</code></dt>
-<dd>flow dimension.</dd>
-<dt><strong><code>h_dim</code></strong> :&ensp;<code>int</code></dt>
-<dd>number of parameters per dimension.</dd>
+<dt><strong><code>trnf</code></strong> :&ensp;<code><a title="flow.flow.Transformer" href="flow.html#flow.flow.Transformer">Transformer</a></code></dt>
+<dd>transformer to use alongside this conditioner.</dd>
 <dt><strong><code>net</code></strong> :&ensp;<code>nn.Module class</code></dt>
 <dd>network to use for MADE.
 Must use <code><a title="flow.conditioner.MaskedLinear" href="#flow.conditioner.MaskedLinear">MaskedLinear</a></code> layers with appropriate masks.
@@ -645,8 +655,8 @@ Defaults to <code><a title="flow.conditioner.MADE_Net" href="#flow.conditioner.M
     def __init__(self, trnf, net=MADE_Net, **kwargs):
         &#34;&#34;&#34;
         Args:
-            dim (int): flow dimension.
-            h_dim (int): number of parameters per dimension.
+            trnf (flow.flow.Transformer): 
+                transformer to use alongside this conditioner.
             net (nn.Module class): network to use for MADE. 
                 Must use `MaskedLinear` layers with appropriate masks. 
                 Defaults to `MADE_Net`.
@@ -670,9 +680,9 @@ Defaults to <code><a title="flow.conditioner.MADE_Net" href="#flow.conditioner.M
             for i in range(self.dim):
                 h_i = self.net(x) # obtain h_i from previously computed x
                 
-                x[:, [self.cond_dim + i]] = trnf(
+                x[:, [self.cond_dim + i]] = self.trnf(
                     u[:, [i]], 
-                    h_i[:, self.h_dim * i : self.h_dim * (i + 1)], 
+                    h_i[:, self.trnf.h_dim * i : self.trnf.h_dim * (i + 1)], 
                     invert=True, 
                     log_det=False
                 )
@@ -680,7 +690,7 @@ Defaults to <code><a title="flow.conditioner.MADE_Net" href="#flow.conditioner.M
         # Run again, this time to get the gradient and log_det if required
         h = self.net(x) # now we can compute for all dimensions
         
-        return trnf(u, h, invert=True, log_det=log_det)</code></pre>
+        return self.trnf(u, h, invert=True, log_det=log_det)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">

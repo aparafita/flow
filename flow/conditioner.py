@@ -111,6 +111,8 @@ class AutoregressiveNaive(Conditioner):
     def __init__(self, trnf, net=None, **kwargs):
         """
         Args:
+            trnf (flow.flow.Transformer): 
+                transformer to use alongside this conditioner.
             net (class): torch.nn.Module class that computes the parameters.
                 If None, defaults to `ConditionerNet` with `default_net`.
         """
@@ -288,8 +290,8 @@ class MADE(Conditioner):
     def __init__(self, trnf, net=MADE_Net, **kwargs):
         """
         Args:
-            dim (int): flow dimension.
-            h_dim (int): number of parameters per dimension.
+            trnf (flow.flow.Transformer): 
+                transformer to use alongside this conditioner.
             net (nn.Module class): network to use for MADE. 
                 Must use `MaskedLinear` layers with appropriate masks. 
                 Defaults to `MADE_Net`.

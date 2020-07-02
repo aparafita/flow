@@ -175,6 +175,7 @@ class Flow(nn.Module):
         assert self.prior is not None
 
         u, log_det = self(x, **kwargs, log_det=True)
+        assert len(log_det.shape) == 1
 
         return self.prior.nll(u) - log_det
 
@@ -194,7 +195,9 @@ class Flow(nn.Module):
         u = self.prior.sample(n)
         loglk_u = -self.prior.nll(u)
 
-        x, log_det = self._invert(u, log_det=True, **kwargs)
+        x, log_det = self(u, log_det=True, invert=True, **kwargs)
+        assert len(log_det.shape) == 1
+
         loglk_x = -nll_x(x, **kwargs)
 
         return loglk_u - log_det - loglk_x
@@ -237,8 +240,8 @@ def inv_flow(flow_cls, name=None):
     class InvFlow(flow_cls):
 
         # Extend forward to swap _transform and _invert
-        def forward(self, t, invert=False, **kwargs):
-            return super().forward(t, invert=not invert, **kwargs)
+        def forward(self, *args, invert=False, **kwargs):
+            return super().forward(*args, invert=not invert, **kwargs)
 
     InvFlow.__name__ = name
     InvFlow.__doc__ = (
@@ -276,13 +279,15 @@ class Sequential(Flow):
 
     # Method overrides
     def _transform(self, x, log_det=False, **kwargs):
-        log_det_sum = 0.
+        log_det_sum = torch.zeros(1, device=x.device)
         
         for flow in self.flows:
             res = flow(x, log_det=log_det, **kwargs)
 
             if log_det:
                 x, log_det_i = res
+                assert len(log_det_i.shape) == 1
+
                 log_det_sum = log_det_sum + log_det_i
             else:
                 x = res
@@ -293,13 +298,15 @@ class Sequential(Flow):
             return x
 
     def _invert(self, u, log_det=False, **kwargs):
-        log_det_sum = 0.
+        log_det_sum = torch.zeros(1, device=u.device)
 
         for flow in reversed(self.flows):
             res = flow(u, invert=True, log_det=log_det, **kwargs)
 
             if log_det:
                 u, log_det_i = res
+                assert len(log_det_i.shape) == 1
+
                 log_det_sum = log_det_sum + log_det_i
             else:
                 u = res
@@ -427,7 +434,7 @@ class Conditioner(Flow):
         elif cond is not None:
             raise ValueError(&#39;Passing cond != None to non-conditional flow&#39;)
 
-        super().forward(*args, cond=cond, **kwargs)
+        return super().forward(*args, cond=cond, **kwargs)
 
     def _transform(self, x, log_det=False, cond=None, **kwargs):
         h = self._h(x, cond=cond, **kwargs)
@@ -617,8 +624,8 @@ If None, defaults to 'Inv' + flow_cls.<strong>name</strong></dd>
     class InvFlow(flow_cls):
 
         # Extend forward to swap _transform and _invert
-        def forward(self, t, invert=False, **kwargs):
-            return super().forward(t, invert=not invert, **kwargs)
+        def forward(self, *args, invert=False, **kwargs):
+            return super().forward(*args, invert=not invert, **kwargs)
 
     InvFlow.__name__ = name
     InvFlow.__doc__ = (
@@ -748,7 +755,7 @@ this is the dimension of the conditioning tensor.</dd>
         elif cond is not None:
             raise ValueError(&#39;Passing cond != None to non-conditional flow&#39;)
 
-        super().forward(*args, cond=cond, **kwargs)
+        return super().forward(*args, cond=cond, **kwargs)
 
     def _transform(self, x, log_det=False, cond=None, **kwargs):
         h = self._h(x, cond=cond, **kwargs)
@@ -836,7 +843,7 @@ this is the dimension of the conditioning tensor.</dd>
     elif cond is not None:
         raise ValueError(&#39;Passing cond != None to non-conditional flow&#39;)
 
-    super().forward(*args, cond=cond, **kwargs)</code></pre>
+    return super().forward(*args, cond=cond, **kwargs)</code></pre>
 </details>
 </dd>
 </dl>
@@ -1012,6 +1019,7 @@ If this flow is in a <code><a title="flow.flow.Sequential" href="#flow.flow.Sequ
         assert self.prior is not None
 
         u, log_det = self(x, **kwargs, log_det=True)
+        assert len(log_det.shape) == 1
 
         return self.prior.nll(u) - log_det
 
@@ -1031,7 +1039,9 @@ If this flow is in a <code><a title="flow.flow.Sequential" href="#flow.flow.Sequ
         u = self.prior.sample(n)
         loglk_u = -self.prior.nll(u)
 
-        x, log_det = self._invert(u, log_det=True, **kwargs)
+        x, log_det = self(u, log_det=True, invert=True, **kwargs)
+        assert len(log_det.shape) == 1
+
         loglk_x = -nll_x(x, **kwargs)
 
         return loglk_u - log_det - loglk_x
@@ -1179,6 +1189,7 @@ as the MLE training loss for a flow.</p></div>
     assert self.prior is not None
 
     u, log_det = self(x, **kwargs, log_det=True)
+    assert len(log_det.shape) == 1
 
     return self.prior.nll(u) - log_det</code></pre>
 </details>
@@ -1218,7 +1229,9 @@ Also receives **kwargs.</dd>
     u = self.prior.sample(n)
     loglk_u = -self.prior.nll(u)
 
-    x, log_det = self._invert(u, log_det=True, **kwargs)
+    x, log_det = self(u, log_det=True, invert=True, **kwargs)
+    assert len(log_det.shape) == 1
+
     loglk_x = -nll_x(x, **kwargs)
 
     return loglk_u - log_det - loglk_x</code></pre>
@@ -1336,13 +1349,15 @@ That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).</p>
 
     # Method overrides
     def _transform(self, x, log_det=False, **kwargs):
-        log_det_sum = 0.
+        log_det_sum = torch.zeros(1, device=x.device)
         
         for flow in self.flows:
             res = flow(x, log_det=log_det, **kwargs)
 
             if log_det:
                 x, log_det_i = res
+                assert len(log_det_i.shape) == 1
+
                 log_det_sum = log_det_sum + log_det_i
             else:
                 x = res
@@ -1353,13 +1368,15 @@ That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).</p>
             return x
 
     def _invert(self, u, log_det=False, **kwargs):
-        log_det_sum = 0.
+        log_det_sum = torch.zeros(1, device=u.device)
 
         for flow in reversed(self.flows):
             res = flow(u, invert=True, log_det=log_det, **kwargs)
 
             if log_det:
                 u, log_det_i = res
+                assert len(log_det_i.shape) == 1
+
                 log_det_sum = log_det_sum + log_det_i
             else:
                 u = res
@@ -1616,10 +1633,9 @@ to transform depending on how it works.</p></div>
 </ul>
 <h3>Subclasses</h3>
 <ul class="hlist">
-<li><a title="flow.transformer.AdamInvTransformer" href="transformer.html#flow.transformer.AdamInvTransformer">AdamInvTransformer</a></li>
 <li><a title="flow.transformer.Affine" href="transformer.html#flow.transformer.Affine">Affine</a></li>
-<li><a title="flow.transformer.IncreasingMonotonicTransformer" href="transformer.html#flow.transformer.IncreasingMonotonicTransformer">IncreasingMonotonicTransformer</a></li>
-<li><a title="flow.transformer.NewtonInvTransformer" href="transformer.html#flow.transformer.NewtonInvTransformer">NewtonInvTransformer</a></li>
+<li>flow.transformer._AdamInvTransformer</li>
+<li>flow.transformer._IncreasingMonotonicTransformer</li>
 </ul>
 <h3>Methods</h3>
 <dl>

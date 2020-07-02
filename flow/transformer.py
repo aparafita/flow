@@ -5,6 +5,7 @@ Of particular interest are:
 
 * `Affine`: affine transformation.
 * `DSF`: Deep Sigmoidal Flow.
+* `NonAffine`: non-affine transformation.
 """
 
 from functools import partial
@@ -67,7 +68,7 @@ class Affine(Transformer):
             return x
 
 
-class IncreasingMonotonicTransformer(Transformer):
+class _IncreasingMonotonicTransformer(Transformer):
     """Abstract Transformer that inverts using Bijection Search, 
         specific for increasing monotonic transformers.
 
@@ -104,7 +105,7 @@ class IncreasingMonotonicTransformer(Transformer):
             return x
 
 
-class AdamInvTransformer(Transformer):
+class _AdamInvTransformer(Transformer):
     """Abstract Transformer that inverts using the Adam optimizer.
 
     Note that using this method, inversion will not be differentiable.
@@ -187,7 +188,7 @@ class AdamInvTransformer(Transformer):
                 return x
 
 
-class NonAffine(AdamInvTransformer):
+class NonAffine(_AdamInvTransformer):
     '''Non-affine transformer.
 
     https://arxiv.org/abs/1912.02762
@@ -254,7 +255,7 @@ class NonAffine(AdamInvTransformer):
             return x
 
 
-class DSF(AdamInvTransformer):
+class DSF(_AdamInvTransformer):
     """Deep Sigmoidal Flow.
 
     https://arxiv.org/abs/1804.00779
