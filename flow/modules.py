@@ -311,3 +311,43 @@ class BatchNorm(Flow):
             return x, log_det
         else:
             return x
+
+
+class Shuffle(Flow):
+    """Perform a dimension-wise permutation."""
+    
+    def __init__(self, perm=None, **kwargs):
+        """
+        Args:
+            perm (torch.Tensor): permutation to apply.
+        """
+        
+        super().__init__(**kwargs)
+        
+        if perm is None:
+            perm = torch.randperm(self.dim)
+                
+        assert perm.shape == (self.dim,)
+        self.register_buffer('perm', perm)
+        
+    def _log_det(self, x):
+        # By doing a permutation, det is always 1 or -1. 
+        # Hence, log|det| is always 0.
+        return torch.zeros_like(x[:, 0])
+        
+    def _transform(self, x, log_det=False, **kwargs):
+        u = x[:, self.perm]
+        
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+        
+    def _invert(self, u, log_det=False, **kwargs):
+        inv_perm = torch.argsort(self.perm)
+        x = u[:, inv_perm]
+        
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x
