@@ -52,15 +52,18 @@ def default_net(
             else:
                 return activation()
 
-    return nn.Sequential(*(
-        layer
-        for layer in (
-            create_layer(n_layer, n_step)
-            for n_layer in range(n_layers)
-            for n_step in range(2)
+    return nn.Sequential(
+        nn.BatchNorm1d(input_dim, affine=False),
+        *(
+            layer
+            for layer in (
+                create_layer(n_layer, n_step)
+                for n_layer in range(n_layers)
+                for n_step in range(2)
+            )
+            if layer is not None
         )
-        if layer is not None
-    ))
+    )
 
 
 class ConditionerNet(nn.Module):
@@ -310,9 +313,9 @@ class MADE(Conditioner):
             for i in range(self.dim):
                 h_i = self.net(x) # obtain h_i from previously computed x
                 
-                x[:, [self.cond_dim + i]] = trnf(
+                x[:, [self.cond_dim + i]] = self.trnf(
                     u[:, [i]], 
-                    h_i[:, self.h_dim * i : self.h_dim * (i + 1)], 
+                    h_i[:, self.trnf.h_dim * i : self.trnf.h_dim * (i + 1)], 
                     invert=True, 
                     log_det=False
                 )
@@ -320,6 +323,6 @@ class MADE(Conditioner):
         # Run again, this time to get the gradient and log_det if required
         h = self.net(x) # now we can compute for all dimensions
         
-        return trnf(u, h, invert=True, log_det=log_det)
+        return self.trnf(u, h, invert=True, log_det=log_det)
 
 # ------------------------------------------------------------------------------
