@@ -28,10 +28,12 @@ def test_flow_affine():
     x = torch.ones(1, 1)
 
     u, log_det = flow(x, log_det=True)
+    assert log_det.shape == (1,)
     assert torch_eq_float(u, 2)
     assert torch_eq_float(log_det, np.log(2))
 
     x2, log_det = flow(u, invert=True, log_det=True)
+    assert log_det.shape == (1,)
     assert torch_eq_float(x2, 1.)
     assert torch_eq_float(log_det, -np.log(2))
 
