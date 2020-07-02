@@ -104,67 +104,6 @@ class IncreasingMonotonicTransformer(Transformer):
             return x
 
 
-class NewtonInvTransformer(Transformer):
-    """Abstract Transformer that inverts using the Newton-Raphson method.
-
-    Note that using this method, inversion will not be differentiable.
-    """
-
-    def __init__(self, inv_eps=1e-3, inv_steps=1000, inv_init=None, lr=1., **kwargs):
-        """        
-        Args:
-            inv_eps (float): minimum difference between f(u) and x
-                allowed to stop the inversion.
-            inv_steps (int): maximum number of iterations 
-                before halting execution. If 0 (default) no maximum defined.
-            inv_init (function): function used to inicialize u.
-                If None, u = x.
-        """
-
-        super().__init__(reversed=reversed, **kwargs)
-
-        self.inv_eps = inv_eps
-        self.inv_steps = inv_steps
-        self.inv_init = inv_init
-        self.lr = lr
-
-    def _invert(self, u, *h, log_det=False, **kwargs):
-        # Inversion by Newton-Raphson: f(x) - u = 0
-        if self.inv_init is not None:
-            x = self.inv_init(u, *h, **kwargs)
-        else:
-            x = monotonic_increasing_bijective_search(
-                self._transform,
-                u, *h, **kwargs,
-                eps=self.inv_eps, max_steps=10
-            )
-
-        step = 1
-        with torch.no_grad():
-            while True:
-                f_x, log_det_i = self._transform(
-                    x, *h, log_det=True, **kwargs
-                )
-
-                if (f_x - u).abs().max() < self.inv_eps or (
-                    self.inv_steps and step >= self.inv_steps
-                ):
-                    break
-                else:
-                    x = x - self.lr * (f_x - u) / \
-                        torch.exp(log_det_i.unsqueeze(1))
-                    step += 1
-
-            if log_det:
-                # Execute transform again to recover log_det
-                _, log_det = self._transform(
-                    x, *h, log_det=True, **kwargs
-                )
-                return x, -log_det
-            else:
-                return x
-
-
 class AdamInvTransformer(Transformer):
     """Abstract Transformer that inverts using the Adam optimizer.
 
@@ -289,10 +228,16 @@ class NonAffine(AdamInvTransformer):
     def _transform(self, u, *h, log_det=False, **kwargs):
         weight, loc, scale, bias = h
         z = u.unsqueeze(2) * scale + loc
+
+        # We need the derivative of each dimension individually,
+        # so we need to reshape to (-1, 1) first.
+        shape = z.shape # save the original shape for later
+        z = z.view(-1, 1)
         
         nl_res = self.nl(z, log_det=log_det)
         if log_det:
             nl_z, log_det_i = nl_res
+            log_det_i = log_det_i.view(*shape) # restore shape
 
             log_det_i = log_sum_exp_trick(
                 torch.log(weight) + log_det_i + torch.log(scale)
@@ -300,6 +245,7 @@ class NonAffine(AdamInvTransformer):
         else:
             nl_z = nl_res
 
+        nl_z = nl_z.view(*shape) # restore shape
         x = (nl_z * weight).sum(dim=2) + bias
 
         if log_det:
@@ -349,15 +295,40 @@ class DSF(AdamInvTransformer):
         # TODO: Avoid computing log_det if not requested
         loc, scale, log_w = h
 
-        z, log_det_z = self.ls(scale * x.unsqueeze(2) + loc, log_det=True)
-        z2 = log_sum_exp_trick(log_w + z)
-        u, log_det_u = self.ls(z2, invert=True, log_det=True)
+        z = scale * x.unsqueeze(2) + loc
 
+        # We need the derivative of each dimension individually,
+        # so we need to reshape to (-1, 1) first.
+        shape = z.shape # save the original shape for later
+        
+        z, log_det_z = self.ls(z.view(-1, 1), log_det=True)
+
+        # Restore shape
+        z = z.view(*shape)
+        log_det_z = log_det_z.view(*shape)
+
+        z2 = log_sum_exp_trick(log_w + z) # this removes the 3rd dimension
+        
+        # Again, we need the derivative of each dimension
+        shape = z2.shape # save shape
+
+        u, log_det_u = self.ls(z2.view(-1, 1), invert=True, log_det=True)
+        
+        # Restore shape
+        u = u.view(*shape)
+        log_det_u = log_det_u.view(*shape)
+
+        # Finally, compute log_det if required
         if log_det:
             log_det = (
                 log_det_u +
                 -z2 +
-                log_sum_exp_trick(log_w + z + log_det_z + torch.log(scale))
+                log_sum_exp_trick(
+                    log_w + 
+                    z + 
+                    log_det_z + 
+                    torch.log(scale)
+                )
             ).sum(dim=1)
 
             return u, log_det
