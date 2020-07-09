@@ -18,7 +18,7 @@ setup(
     author='Álvaro Parafita',
     author_email='parafita.alvaro@gmail.com',
     url='https://github.com/aparafita/flow-torch',
-    download_url='https://github.com/aparafita/flow-torch/archive/0.1.tar.gz',
+    download_url='https://github.com/aparafita/flow-torch/archive/v0.1.tar.gz',
     keywords=[
         'flow', 'density', 'estimation', 
         'sampling', 'probability', 'distribution'
