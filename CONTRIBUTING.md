@@ -5,7 +5,7 @@ Welcome to the Contributors section, thank you for your time!
 
 * Tutorials
 * [Examples](examples/)
-* [Documentation](https://aparafita.github.io/flow)
+* [Documentation](https://aparafita.github.io/flow-torch)
 
 
 # Testing

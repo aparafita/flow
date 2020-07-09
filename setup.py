@@ -1,21 +1,30 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
-import setuptools
 
 with open('requirements.txt') as f:
     install_requires = [line.strip() for line in f if line.strip()]
 
 setup(
     name='flow',
-    version='1.0',
-    description='Flow models in PyTorch',
+    packages=['flow'],
+    version='0.1',
+    license='MIT',
+    description='Normalizing Flow models in PyTorch',
     author='Álvaro Parafita',
     author_email='parafita.alvaro@gmail.com',
-    packages=setuptools.find_packages(),
+    url='https://github.com/aparafita/flow-torch',
+    keywords=[
+        'flow', 'density', 'estimation', 
+        'sampling', 'probability', 'distribution'
+    ],
     classifiers=[
-        'Programming Language :: Python :: 3',
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
         'Operating System :: OS Independent',
     ],
     install_requires=install_requires

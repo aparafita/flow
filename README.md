@@ -17,7 +17,7 @@ conditioned by a given conditioning tensor. Specially useful for modelling causa
 ## Installation
 
 ```
-git clone https://github.com/aparafita/flow.git
+git clone https://github.com/aparafita/flow-torch.git
 cd flow
 pip install -e .
 ```
@@ -98,7 +98,7 @@ Real samples|Fake samples (unconditional)|Fake samples (conditional)
 
 ## Documentation
 
-Documentation can be found [here](https://aparafita.github.io/flow)
+Documentation can be found [here](https://aparafita.github.io/flow-torch)
 
 * Examples: notebook examples in the [examples](examples/) folder.
 * TODO: Tutorials
