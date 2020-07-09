@@ -2,6 +2,8 @@
 
 from setuptools import setup
 
+version = '0.1'
+
 long_description = """
 # flow
 
@@ -27,7 +29,7 @@ with open('requirements.txt') as f:
 setup(
     name='flow-torch',
     packages=['flow'],
-    version='0.1',
+    version=version,
     license='MIT',
     description='Normalizing Flow models in PyTorch',
     long_description=long_description,
@@ -35,7 +37,7 @@ setup(
     author='Álvaro Parafita',
     author_email='parafita.alvaro@gmail.com',
     url='https://github.com/aparafita/flow',
-    download_url='https://github.com/aparafita/flow/archive/v0.1.tar.gz',
+    download_url=f'https://github.com/aparafita/flow/archive/v{version}.tar.gz',
     keywords=[
         'flow', 'density', 'estimation', 
         'sampling', 'probability', 'distribution'
