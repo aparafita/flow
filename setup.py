@@ -1,9 +1,25 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup
 
-with open('README.md') as f:
-    readme = f.read()
+long_description = """
+# flow
+
+This project implements basic Normalizing Flows in PyTorch 
+and provides functionality for defining your own easily, 
+following the conditioner-transformer architecture.
+
+This is specially useful for lower-dimensional flows and for learning purposes.
+Nevertheless, work is being done on extending its functionalities 
+to also accomodate for higher dimensional flows.
+
+Supports conditioning flows, meaning, learning probability distributions
+conditioned by a given conditioning tensor. 
+Specially useful for modelling causal mechanisms.
+
+For more information, 
+please look at our [Github page](https://github.com/aparafita/flow).
+"""
 
 with open('requirements.txt') as f:
     install_requires = [line.strip() for line in f if line.strip()]
@@ -14,11 +30,12 @@ setup(
     version='0.1',
     license='MIT',
     description='Normalizing Flow models in PyTorch',
-    long_description=readme,
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     author='Álvaro Parafita',
     author_email='parafita.alvaro@gmail.com',
-    url='https://github.com/aparafita/flow-torch',
-    download_url='https://github.com/aparafita/flow-torch/archive/v0.1.tar.gz',
+    url='https://github.com/aparafita/flow',
+    download_url='https://github.com/aparafita/flow/archive/v0.1.tar.gz',
     keywords=[
         'flow', 'density', 'estimation', 
         'sampling', 'probability', 'distribution'
@@ -32,5 +49,6 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Operating System :: OS Independent',
     ],
-    install_requires=install_requires
+    install_requires=install_requires,
+    include_package_data=True,
 )

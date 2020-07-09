@@ -17,7 +17,7 @@ conditioned by a given conditioning tensor. Specially useful for modelling causa
 ## Installation
 
 ```
-git clone https://github.com/aparafita/flow-torch.git
+git clone https://github.com/aparafita/flow.git
 cd flow
 pip install -e .
 ```
