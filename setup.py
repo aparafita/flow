@@ -2,18 +2,23 @@
 
 from distutils.core import setup
 
+with open('README.md') as f:
+    readme = f.read()
+
 with open('requirements.txt') as f:
     install_requires = [line.strip() for line in f if line.strip()]
 
 setup(
-    name='flow',
+    name='flow-torch',
     packages=['flow'],
     version='0.1',
     license='MIT',
     description='Normalizing Flow models in PyTorch',
+    long_description=readme,
     author='Álvaro Parafita',
     author_email='parafita.alvaro@gmail.com',
     url='https://github.com/aparafita/flow-torch',
+    download_url='https://github.com/aparafita/flow-torch/archive/0.1.tar.gz',
     keywords=[
         'flow', 'density', 'estimation', 
         'sampling', 'probability', 'distribution'
