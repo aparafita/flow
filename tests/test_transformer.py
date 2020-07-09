@@ -50,3 +50,10 @@ def test_shape_and_return_requirements(trnf, dim=2):
 
     assert x2.shape == x.shape
     assert log_det.shape == (x.size(0),)
+
+    h_init = trnf._h_init()
+    assert h_init is None or (
+        isinstance(h_init, torch.Tensor) and
+        h_init.shape == (trnf.dim * trnf.h_dim,) and
+        h_init.device == trnf.device
+    )

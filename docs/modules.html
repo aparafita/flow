@@ -338,6 +338,46 @@ class BatchNorm(Flow):
             log_det = -self._log_det(scale, bscale)
             return x, log_det
         else:
+            return x
+
+
+class Shuffle(Flow):
+    &#34;&#34;&#34;Perform a dimension-wise permutation.&#34;&#34;&#34;
+    
+    def __init__(self, perm=None, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            perm (torch.Tensor): permutation to apply.
+        &#34;&#34;&#34;
+        
+        super().__init__(**kwargs)
+        
+        if perm is None:
+            perm = torch.randperm(self.dim)
+                
+        assert perm.shape == (self.dim,)
+        self.register_buffer(&#39;perm&#39;, perm)
+        
+    def _log_det(self, x):
+        # By doing a permutation, det is always 1 or -1. 
+        # Hence, log|det| is always 0.
+        return torch.zeros_like(x[:, 0])
+        
+    def _transform(self, x, log_det=False, **kwargs):
+        u = x[:, self.perm]
+        
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+        
+    def _invert(self, u, log_det=False, **kwargs):
+        inv_perm = torch.argsort(self.perm)
+        x = u[:, inv_perm]
+        
+        if log_det:
+            return x, -self._log_det(x)
+        else:
             return x</code></pre>
 </details>
 </section>
@@ -723,6 +763,81 @@ of batch statistics. Must be between 0 and 1.</dd>
 </li>
 </ul>
 </dd>
+<dt id="flow.modules.Shuffle"><code class="flex name class">
+<span>class <span class="ident">Shuffle</span></span>
+<span>(</span><span>perm=None, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Perform a dimension-wise permutation.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>perm</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>permutation to apply.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Shuffle(Flow):
+    &#34;&#34;&#34;Perform a dimension-wise permutation.&#34;&#34;&#34;
+    
+    def __init__(self, perm=None, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            perm (torch.Tensor): permutation to apply.
+        &#34;&#34;&#34;
+        
+        super().__init__(**kwargs)
+        
+        if perm is None:
+            perm = torch.randperm(self.dim)
+                
+        assert perm.shape == (self.dim,)
+        self.register_buffer(&#39;perm&#39;, perm)
+        
+    def _log_det(self, x):
+        # By doing a permutation, det is always 1 or -1. 
+        # Hence, log|det| is always 0.
+        return torch.zeros_like(x[:, 0])
+        
+    def _transform(self, x, log_det=False, **kwargs):
+        u = x[:, self.perm]
+        
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+        
+    def _invert(self, u, log_det=False, **kwargs):
+        inv_perm = torch.argsort(self.perm)
+        x = u[:, inv_perm]
+        
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.flow.Flow.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.flow.Flow.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.flow.Flow.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.flow.Flow.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.flow.Flow.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.flow.Flow.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.flow.Flow.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+<li><code><a title="flow.flow.Flow.warm_start" href="flow.html#flow.flow.Flow.warm_start">warm_start</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
 <dt id="flow.modules.Sigmoid"><code class="flex name class">
 <span>class <span class="ident">Sigmoid</span></span>
 <span>(</span><span>alpha=1.0, eps=0.01, **kwargs)</span>
@@ -910,6 +1025,9 @@ Default: 20.</dd>
 </li>
 <li>
 <h4><code><a title="flow.modules.LogSigmoid" href="#flow.modules.LogSigmoid">LogSigmoid</a></code></h4>
+</li>
+<li>
+<h4><code><a title="flow.modules.Shuffle" href="#flow.modules.Shuffle">Shuffle</a></code></h4>
 </li>
 <li>
 <h4><code><a title="flow.modules.Sigmoid" href="#flow.modules.Sigmoid">Sigmoid</a></code></h4>

@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.8.1" />
+<title>flow.training API documentation</title>
+<meta name="description" content="Train utilities for flows …" />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script async src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS_CHTML'></script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>flow.training</code></h1>
+</header>
+<section id="section-intro">
+<p>Train utilities for flows.</p>
+<p>Includes functions:</p>
+<ul>
+<li><code><a title="flow.training.get_device" href="#flow.training.get_device">get_device()</a></code>: get the default torch.device (cuda if available).</li>
+<li><code><a title="flow.training.train" href="#flow.training.train">train()</a></code>: used to train flows with early stopping.</li>
+<li><code><a title="flow.training.plot_losses" href="#flow.training.plot_losses">plot_losses()</a></code>: plot training and validation losses from a <code><a title="flow.training.train" href="#flow.training.train">train()</a></code> session.</li>
+<li><code><a title="flow.training.test_nll" href="#flow.training.test_nll">test_nll()</a></code>: compute the test negative-loglikelihood of the test set.</li>
+</ul>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+Train utilities for flows.
+
+Includes functions:
+
+* `get_device`: get the default torch.device (cuda if available).
+* `train`: used to train flows with early stopping.
+* `plot_losses`: plot training and validation losses from a `train` session.
+* `test_nll`: compute the test negative-loglikelihood of the test set.
+&#34;&#34;&#34;
+
+
+from tempfile import TemporaryFile
+from collections import OrderedDict
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+from tqdm import tqdm
+
+import torch
+from torch import nn, optim
+
+from . import Flow
+
+
+def get_device():
+    &#34;&#34;&#34;Return default cuda device if available, cpu otherwise.&#34;&#34;&#34;
+    return torch.device(&#39;cuda&#39; if torch.cuda.is_available() else &#39;cpu&#39;)
+
+
+def train(
+    flow, trainX, valX, cond_train=None, cond_val=None, loss_f=None,
+    batch_size=32, optimizer=optim.Adam, optimizer_kwargs=dict(lr=1e-3),
+    n_epochs=int(1e6), patience=100, 
+):
+    r&#34;&#34;&#34;Train Flow model with (optional) early stopping.
+
+    Can KeyboardInterrupt safely; 
+    the resulting model will be the best one before the interruption.
+
+    Args:
+        flow (Flow): flow to train.
+        
+        trainX (torch.Tensor): training dataset.
+        valX (torch.Tensor): validation dataset.
+
+        cond_train (torch.Tensor): conditioning tensor for trainX.
+            If None, non-conditional flow assumed.
+        cond_val (torch.Tensor): conditioning tensor for valX.
+            If None, non-conditional flow assumed.
+
+        loss_f (func): function(batch, idx, cond=None) to use as loss. 
+            If None, uses flow.nll(batch, cond=cond) instead.
+
+            idx is an index tensor signaling which entries in trainX or valX
+            (depending on whether flow.training is True) are contained in batch.
+            cond is an optional keyword argument with the conditioning tensor,
+            if the flow is conditional. Otherwise, it&#39;s just None 
+            and should be ignored.
+            Returns a tensor with the loss computed for each entry in the batch.
+            
+        
+        batch_size (int or float): If float, ratio of trainX to use per batch.
+            If int, batch size.
+        optimizer (torch.optim.Optimizer): optimizer class to use.
+        optimizer_kwargs (dict): kwargs to pass to the optimizer.
+
+        n_epochs (int): maximum number of epochs for training.
+        patience (int): maximum number of epochs with no improvement
+            in validation loss before stopping. 
+            To avoid using early stopping, set to 0.
+
+    Returns:
+        train_losses: list with entries (float(epoch), loss).
+        val_losses: list with entries (epoch, loss).
+
+    The results of this function can be passed to `plot_losses` directly.
+    &#34;&#34;&#34;
+    
+    assert isinstance(flow, Flow)
+    assert flow.prior is not None, &#39;flow.prior is required&#39;
+
+    conditional = cond_train is not None or cond_val is not None
+    if conditional:
+        assert (cond_train is not None and cond_val is not None), \
+            &#39;If flow is conditional, pass cond_train and cond_val&#39;
+    else:
+        cond = None # let&#39;s just leave it as a None for later
+
+    if isinstance(batch_size, float):
+        assert 0. &lt; batch_size and batch_size &lt;= 1.
+        batch_size = int(batch_size * len(trainX))
+
+    optimizer = optimizer(flow.parameters(), **optimizer_kwargs)
+
+    train_losses, val_losses = [], []
+    
+    best_loss = np.inf
+    best_epoch = 0
+    best_model = None
+
+    if loss_f is None:
+        loss_f = lambda batch, idx, cond=None: flow.nll(batch, cond=cond)
+
+    best_model = TemporaryFile()
+
+    try:
+        with tqdm(n_epochs, leave=True, position=0) as tq:
+            for epoch in range(1, n_epochs + 1):
+                # Train
+                flow.train()
+                X = trainX
+                idx = torch.randperm(len(X), device=X.device)
+                for n in range(0, len(X), batch_size):
+                    if len(X) - n == 1: continue
+                    subidx = idx[n:n + batch_size]
+                    batch = X[subidx].to(flow.device)
+                    if conditional:
+                        cond = cond_train[subidx].to(flow.device)
+
+                    loss = loss_f(batch, subidx, cond=cond).mean()
+
+                    assert not torch.isnan(loss) and not torch.isinf(loss)
+                    
+                    # Pytorch recipe: zero_grad - backward - step
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    
+                    train_losses.append((epoch + n / len(trainX), loss.item()))
+                
+                # Validation
+                flow.eval()
+                X = valX
+                idx = torch.randperm(len(X), device=X.device)
+                with torch.no_grad(): # won&#39;t accumulate info about gradient
+                    val_loss = 0.
+                    for n in range(0, len(X), batch_size):
+                        subidx = idx[n:n + batch_size]
+                        batch = X[subidx].to(flow.device)
+                        if conditional:
+                            cond = cond_val[subidx].to(flow.device)
+
+                        val_loss += (
+                            loss_f(batch, subidx, cond=cond).sum() / len(X)
+                        ).item()
+
+                    val_losses.append((epoch, val_loss))
+
+                assert not np.isnan(val_loss) and not np.isinf(val_loss)
+
+                # Early stopping
+                if best_loss &gt; val_loss:
+                    best_loss = val_loss
+                    best_epoch = epoch
+                    
+                    best_model.seek(0)
+                    torch.save(flow.state_dict(), best_model)
+                    
+                tq.update()
+                tq.set_postfix(OrderedDict(
+                    current_loss=val_loss, 
+                    best_epoch=best_epoch, 
+                    best_loss=best_loss
+                ))
+
+                if patience and epoch - best_epoch &gt;= patience:
+                    break
+
+    except KeyboardInterrupt:
+        print(&#39;Interrupted at epoch&#39;, epoch)
+        pass # halt training without losing everything
+
+    # Load best model before exiting
+    best_model.seek(0)
+    flow.load_state_dict(torch.load(best_model))
+    best_model.close()
+
+    flow.eval() # pass to eval mode before returning
+
+    return train_losses, val_losses
+
+
+def plot_losses(train_losses, val_losses, cellsize=(6, 4)):
+    &#34;&#34;&#34;Plot train and validation losses from a `train` call.
+
+    Args:
+        train_losses (list): (epoch, loss) pairs to plot for training.
+        val_losses (list): (epoch, loss) pairs to plot for validation.
+        cellsize (tuple): (width, height) for each cell in the plot.
+    &#34;&#34;&#34;
+
+    best_epoch, best_loss = min(val_losses, key=lambda pair: pair[1])
+
+    w, h = cellsize
+    fig, axes = plt.subplots(1, 2, figsize=(w * 2, h * 1))
+
+    axes[0].set_title(&#39;train_loss&#39;)
+    axes[0].plot(*np.array(train_losses).T)
+
+    axes[1].set_title(&#39;val_loss&#39;)
+    axes[1].plot(*np.array(val_losses).T)
+    axes[1].axvline(best_epoch, ls=&#39;dashed&#39;, color=&#39;gray&#39;)
+
+
+def test_nll(flow, testX, cond_test=None, batch_size=32):
+    &#34;&#34;&#34;Compute test nll using batches.
+
+    Args:
+        flow (Flow): flow to train.
+        testX (torch.Tensor): test dataset.
+        cond_test (torch.Tensor or None): conditioning tensor for testX, 
+            if the flow is conditional.
+        batch_size (int or float): if float, ratio of testX to use per batch.
+            If int, batch size.
+    &#34;&#34;&#34;
+
+    assert isinstance(flow, Flow)
+    assert flow.prior is not None, &#39;flow.prior is required&#39;
+
+    conditional = cond_test is not None
+
+    if isinstance(batch_size, float):
+        assert 0. &lt; batch_size and batch_size &lt;= 1.
+        batch_size = int(batch_size * len(trainX))
+
+    flow.eval()
+    with torch.no_grad(): # won&#39;t accumulate info about gradient
+        loss = 0.
+        for n in range(0, len(testX), batch_size):
+            idx = torch.arange(n, min(n + batch_size, len(testX)))
+
+            batch = testX[idx].to(flow.device)
+            if conditional:
+                cond = cond_test[idx].to(flow.device)
+            else:
+                cond = None
+
+            loss += (flow.nll(batch, cond=cond).sum() / len(testX)).item()
+
+    return loss</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="flow.training.get_device"><code class="name flex">
+<span>def <span class="ident">get_device</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Return default cuda device if available, cpu otherwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_device():
+    &#34;&#34;&#34;Return default cuda device if available, cpu otherwise.&#34;&#34;&#34;
+    return torch.device(&#39;cuda&#39; if torch.cuda.is_available() else &#39;cpu&#39;)</code></pre>
+</details>
+</dd>
+<dt id="flow.training.plot_losses"><code class="name flex">
+<span>def <span class="ident">plot_losses</span></span>(<span>train_losses, val_losses, cellsize=(6, 4))</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Plot train and validation losses from a <code><a title="flow.training.train" href="#flow.training.train">train()</a></code> call.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>train_losses</code></strong> :&ensp;<code>list</code></dt>
+<dd>(epoch, loss) pairs to plot for training.</dd>
+<dt><strong><code>val_losses</code></strong> :&ensp;<code>list</code></dt>
+<dd>(epoch, loss) pairs to plot for validation.</dd>
+<dt><strong><code>cellsize</code></strong> :&ensp;<code>tuple</code></dt>
+<dd>(width, height) for each cell in the plot.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def plot_losses(train_losses, val_losses, cellsize=(6, 4)):
+    &#34;&#34;&#34;Plot train and validation losses from a `train` call.
+
+    Args:
+        train_losses (list): (epoch, loss) pairs to plot for training.
+        val_losses (list): (epoch, loss) pairs to plot for validation.
+        cellsize (tuple): (width, height) for each cell in the plot.
+    &#34;&#34;&#34;
+
+    best_epoch, best_loss = min(val_losses, key=lambda pair: pair[1])
+
+    w, h = cellsize
+    fig, axes = plt.subplots(1, 2, figsize=(w * 2, h * 1))
+
+    axes[0].set_title(&#39;train_loss&#39;)
+    axes[0].plot(*np.array(train_losses).T)
+
+    axes[1].set_title(&#39;val_loss&#39;)
+    axes[1].plot(*np.array(val_losses).T)
+    axes[1].axvline(best_epoch, ls=&#39;dashed&#39;, color=&#39;gray&#39;)</code></pre>
+</details>
+</dd>
+<dt id="flow.training.test_nll"><code class="name flex">
+<span>def <span class="ident">test_nll</span></span>(<span>flow, testX, cond_test=None, batch_size=32)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Compute test nll using batches.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>flow</code></strong> :&ensp;<code>Flow</code></dt>
+<dd>flow to train.</dd>
+<dt><strong><code>testX</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>test dataset.</dd>
+<dt><strong><code>cond_test</code></strong> :&ensp;<code>torch.Tensor</code> or <code>None</code></dt>
+<dd>conditioning tensor for testX,
+if the flow is conditional.</dd>
+<dt><strong><code>batch_size</code></strong> :&ensp;<code>int</code> or <code>float</code></dt>
+<dd>if float, ratio of testX to use per batch.
+If int, batch size.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def test_nll(flow, testX, cond_test=None, batch_size=32):
+    &#34;&#34;&#34;Compute test nll using batches.
+
+    Args:
+        flow (Flow): flow to train.
+        testX (torch.Tensor): test dataset.
+        cond_test (torch.Tensor or None): conditioning tensor for testX, 
+            if the flow is conditional.
+        batch_size (int or float): if float, ratio of testX to use per batch.
+            If int, batch size.
+    &#34;&#34;&#34;
+
+    assert isinstance(flow, Flow)
+    assert flow.prior is not None, &#39;flow.prior is required&#39;
+
+    conditional = cond_test is not None
+
+    if isinstance(batch_size, float):
+        assert 0. &lt; batch_size and batch_size &lt;= 1.
+        batch_size = int(batch_size * len(trainX))
+
+    flow.eval()
+    with torch.no_grad(): # won&#39;t accumulate info about gradient
+        loss = 0.
+        for n in range(0, len(testX), batch_size):
+            idx = torch.arange(n, min(n + batch_size, len(testX)))
+
+            batch = testX[idx].to(flow.device)
+            if conditional:
+                cond = cond_test[idx].to(flow.device)
+            else:
+                cond = None
+
+            loss += (flow.nll(batch, cond=cond).sum() / len(testX)).item()
+
+    return loss</code></pre>
+</details>
+</dd>
+<dt id="flow.training.train"><code class="name flex">
+<span>def <span class="ident">train</span></span>(<span>flow, trainX, valX, cond_train=None, cond_val=None, loss_f=None, batch_size=32, optimizer=torch.optim.adam.Adam, optimizer_kwargs={'lr': 0.001}, n_epochs=1000000, patience=100)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Train Flow model with (optional) early stopping.</p>
+<p>Can KeyboardInterrupt safely;
+the resulting model will be the best one before the interruption.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>flow</code></strong> :&ensp;<code>Flow</code></dt>
+<dd>flow to train.</dd>
+<dt><strong><code>trainX</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>training dataset.</dd>
+<dt><strong><code>valX</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>validation dataset.</dd>
+<dt><strong><code>cond_train</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>conditioning tensor for trainX.
+If None, non-conditional flow assumed.</dd>
+<dt><strong><code>cond_val</code></strong> :&ensp;<code>torch.Tensor</code></dt>
+<dd>conditioning tensor for valX.
+If None, non-conditional flow assumed.</dd>
+<dt><strong><code>loss_f</code></strong> :&ensp;<code>func</code></dt>
+<dd>
+<p>function(batch, idx, cond=None) to use as loss.
+If None, uses flow.nll(batch, cond=cond) instead.</p>
+<p>idx is an index tensor signaling which entries in trainX or valX
+(depending on whether flow.training is True) are contained in batch.
+cond is an optional keyword argument with the conditioning tensor,
+if the flow is conditional. Otherwise, it's just None
+and should be ignored.
+Returns a tensor with the loss computed for each entry in the batch.</p>
+</dd>
+<dt><strong><code>batch_size</code></strong> :&ensp;<code>int</code> or <code>float</code></dt>
+<dd>If float, ratio of trainX to use per batch.
+If int, batch size.</dd>
+<dt><strong><code>optimizer</code></strong> :&ensp;<code>torch.optim.Optimizer</code></dt>
+<dd>optimizer class to use.</dd>
+<dt><strong><code>optimizer_kwargs</code></strong> :&ensp;<code>dict</code></dt>
+<dd>kwargs to pass to the optimizer.</dd>
+<dt><strong><code>n_epochs</code></strong> :&ensp;<code>int</code></dt>
+<dd>maximum number of epochs for training.</dd>
+<dt><strong><code>patience</code></strong> :&ensp;<code>int</code></dt>
+<dd>maximum number of epochs with no improvement
+in validation loss before stopping.
+To avoid using early stopping, set to 0.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>train_losses</code></dt>
+<dd>list with entries (float(epoch), loss).</dd>
+<dt><code>val_losses</code></dt>
+<dd>list with entries (epoch, loss).</dd>
+</dl>
+<p>The results of this function can be passed to <code><a title="flow.training.plot_losses" href="#flow.training.plot_losses">plot_losses()</a></code> directly.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train(
+    flow, trainX, valX, cond_train=None, cond_val=None, loss_f=None,
+    batch_size=32, optimizer=optim.Adam, optimizer_kwargs=dict(lr=1e-3),
+    n_epochs=int(1e6), patience=100, 
+):
+    r&#34;&#34;&#34;Train Flow model with (optional) early stopping.
+
+    Can KeyboardInterrupt safely; 
+    the resulting model will be the best one before the interruption.
+
+    Args:
+        flow (Flow): flow to train.
+        
+        trainX (torch.Tensor): training dataset.
+        valX (torch.Tensor): validation dataset.
+
+        cond_train (torch.Tensor): conditioning tensor for trainX.
+            If None, non-conditional flow assumed.
+        cond_val (torch.Tensor): conditioning tensor for valX.
+            If None, non-conditional flow assumed.
+
+        loss_f (func): function(batch, idx, cond=None) to use as loss. 
+            If None, uses flow.nll(batch, cond=cond) instead.
+
+            idx is an index tensor signaling which entries in trainX or valX
+            (depending on whether flow.training is True) are contained in batch.
+            cond is an optional keyword argument with the conditioning tensor,
+            if the flow is conditional. Otherwise, it&#39;s just None 
+            and should be ignored.
+            Returns a tensor with the loss computed for each entry in the batch.
+            
+        
+        batch_size (int or float): If float, ratio of trainX to use per batch.
+            If int, batch size.
+        optimizer (torch.optim.Optimizer): optimizer class to use.
+        optimizer_kwargs (dict): kwargs to pass to the optimizer.
+
+        n_epochs (int): maximum number of epochs for training.
+        patience (int): maximum number of epochs with no improvement
+            in validation loss before stopping. 
+            To avoid using early stopping, set to 0.
+
+    Returns:
+        train_losses: list with entries (float(epoch), loss).
+        val_losses: list with entries (epoch, loss).
+
+    The results of this function can be passed to `plot_losses` directly.
+    &#34;&#34;&#34;
+    
+    assert isinstance(flow, Flow)
+    assert flow.prior is not None, &#39;flow.prior is required&#39;
+
+    conditional = cond_train is not None or cond_val is not None
+    if conditional:
+        assert (cond_train is not None and cond_val is not None), \
+            &#39;If flow is conditional, pass cond_train and cond_val&#39;
+    else:
+        cond = None # let&#39;s just leave it as a None for later
+
+    if isinstance(batch_size, float):
+        assert 0. &lt; batch_size and batch_size &lt;= 1.
+        batch_size = int(batch_size * len(trainX))
+
+    optimizer = optimizer(flow.parameters(), **optimizer_kwargs)
+
+    train_losses, val_losses = [], []
+    
+    best_loss = np.inf
+    best_epoch = 0
+    best_model = None
+
+    if loss_f is None:
+        loss_f = lambda batch, idx, cond=None: flow.nll(batch, cond=cond)
+
+    best_model = TemporaryFile()
+
+    try:
+        with tqdm(n_epochs, leave=True, position=0) as tq:
+            for epoch in range(1, n_epochs + 1):
+                # Train
+                flow.train()
+                X = trainX
+                idx = torch.randperm(len(X), device=X.device)
+                for n in range(0, len(X), batch_size):
+                    if len(X) - n == 1: continue
+                    subidx = idx[n:n + batch_size]
+                    batch = X[subidx].to(flow.device)
+                    if conditional:
+                        cond = cond_train[subidx].to(flow.device)
+
+                    loss = loss_f(batch, subidx, cond=cond).mean()
+
+                    assert not torch.isnan(loss) and not torch.isinf(loss)
+                    
+                    # Pytorch recipe: zero_grad - backward - step
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    
+                    train_losses.append((epoch + n / len(trainX), loss.item()))
+                
+                # Validation
+                flow.eval()
+                X = valX
+                idx = torch.randperm(len(X), device=X.device)
+                with torch.no_grad(): # won&#39;t accumulate info about gradient
+                    val_loss = 0.
+                    for n in range(0, len(X), batch_size):
+                        subidx = idx[n:n + batch_size]
+                        batch = X[subidx].to(flow.device)
+                        if conditional:
+                            cond = cond_val[subidx].to(flow.device)
+
+                        val_loss += (
+                            loss_f(batch, subidx, cond=cond).sum() / len(X)
+                        ).item()
+
+                    val_losses.append((epoch, val_loss))
+
+                assert not np.isnan(val_loss) and not np.isinf(val_loss)
+
+                # Early stopping
+                if best_loss &gt; val_loss:
+                    best_loss = val_loss
+                    best_epoch = epoch
+                    
+                    best_model.seek(0)
+                    torch.save(flow.state_dict(), best_model)
+                    
+                tq.update()
+                tq.set_postfix(OrderedDict(
+                    current_loss=val_loss, 
+                    best_epoch=best_epoch, 
+                    best_loss=best_loss
+                ))
+
+                if patience and epoch - best_epoch &gt;= patience:
+                    break
+
+    except KeyboardInterrupt:
+        print(&#39;Interrupted at epoch&#39;, epoch)
+        pass # halt training without losing everything
+
+    # Load best model before exiting
+    best_model.seek(0)
+    flow.load_state_dict(torch.load(best_model))
+    best_model.close()
+
+    flow.eval() # pass to eval mode before returning
+
+    return train_losses, val_losses</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="flow" href="index.html">flow</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="flow.training.get_device" href="#flow.training.get_device">get_device</a></code></li>
+<li><code><a title="flow.training.plot_losses" href="#flow.training.plot_losses">plot_losses</a></code></li>
+<li><code><a title="flow.training.test_nll" href="#flow.training.test_nll">test_nll</a></code></li>
+<li><code><a title="flow.training.train" href="#flow.training.train">train</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.8.1</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>
