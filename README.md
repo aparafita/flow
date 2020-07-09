@@ -94,7 +94,7 @@ Real samples|Fake samples (unconditional)|Fake samples (conditional)
 
 ## Documentation
 
-Documentation can be found [here](https://aparafita.github.io/flow-torch)
+Documentation can be found [here](https://aparafita.github.io/flow)
 
 * Examples: notebook examples in the [examples](examples/) folder.
 * TODO: Tutorials
