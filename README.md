@@ -20,8 +20,6 @@ conditioned by a given conditioning tensor. Specially useful for modelling causa
 pip install flow-torch
 ```
 
-**TODO**: upload to PyPi
-
 ## Dependencies
 
 This project tries to be as lightweight as possible. 
