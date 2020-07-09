@@ -87,6 +87,9 @@ class Flow(nn.Module):
     Note that in training, using forward or backward KL divergence,
     _transform or _invert should be differentiable w.r.t. the flow&#39;s parameters,
     respectively. Otherwise, the flow would not learn.
+
+    Remember that it&#39;s convenient for training stability to initialize
+    the flow so that it performs the identity transformation (or close to it).
     &#34;&#34;&#34;
 
     def __init__(self, dim=1, prior=None, **kwargs):
@@ -387,10 +390,19 @@ class Conditioner(Flow):
         ...
     ```
 
-    Note that a Conditioner does not require an implementation 
+    Note that a `Conditioner` does not require an implementation 
     for method _transform, since it is dealt with by the transformer.
     However, it does need one for _invert, 
-    since it depends on the implemented conditioner.&#34;&#34;&#34;
+    since it depends on the implemented conditioner.
+
+    Note that `Transformer` exposes a _h_init method that, 
+    if it doesn&#39;t return None, should return an initialization value 
+    for pre-activation parameters h. This is useful to initialize
+    a Flow to the identity transformation, for training stability.
+    For example, if your conditioner returns h as the result 
+    of a feed-forward MLP, you could initialize all weights and biases 
+    as randn() * 1e-3, and the last layer biases as the result of _h_init.
+    &#34;&#34;&#34;
 
 
     conditional = True
@@ -510,6 +522,10 @@ class Transformer(Flow):
     def _invert(self, x, *h, log_det=False, **kwargs):
         # Transform u into x using parameters h.
         ...
+
+    def _h_init(self):
+        # Return initialization values for pre-activation h parameters.
+        ...
     ```
 
     Note that forward, _transform and _invert all receive h,
@@ -520,7 +536,7 @@ class Transformer(Flow):
     As an example, an Affine transformer has h_dim=2 (loc and scale)
     for each dimension in the flow.
 
-    CAUTION: all three methods need to be general enough 
+    CAUTION: all the three first methods need to be general enough 
         to work with dim=1 or an arbitrary dim,
         since the conditioner might pass any number of dimensions
         to transform depending on how it works.
@@ -583,7 +599,16 @@ class Transformer(Flow):
         raise NotImplementedError()
 
     def _invert(self, u, *h, log_det=False, **kwargs):
-        raise NotImplementedError()</code></pre>
+        raise NotImplementedError()
+
+    def _h_init(self):
+        &#34;&#34;&#34;Return initialization values for pre-activation h parameters.
+        
+        Returns:
+            result: None if no initialization is required or
+                tensor with shape (dim * h_dim,) with the initialization values.
+        &#34;&#34;&#34;
+        return None # by default, no initialization suggested</code></pre>
 </details>
 </section>
 <section>
@@ -666,10 +691,17 @@ def _invert(self, u, cond=None, log_det=False, **kwargs):
     # Transform u into x.
     ...
 </code></pre>
-<p>Note that a Conditioner does not require an implementation
+<p>Note that a <code><a title="flow.flow.Conditioner" href="#flow.flow.Conditioner">Conditioner</a></code> does not require an implementation
 for method _transform, since it is dealt with by the transformer.
 However, it does need one for _invert,
 since it depends on the implemented conditioner.</p>
+<p>Note that <code><a title="flow.flow.Transformer" href="#flow.flow.Transformer">Transformer</a></code> exposes a _h_init method that,
+if it doesn't return None, should return an initialization value
+for pre-activation parameters h. This is useful to initialize
+a Flow to the identity transformation, for training stability.
+For example, if your conditioner returns h as the result
+of a feed-forward MLP, you could initialize all weights and biases
+as randn() * 1e-3, and the last layer biases as the result of _h_init.</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>trnf</code></strong> :&ensp;<code><a title="flow.flow.Transformer" href="#flow.flow.Transformer">Transformer</a></code></dt>
@@ -708,10 +740,19 @@ this is the dimension of the conditioning tensor.</dd>
         ...
     ```
 
-    Note that a Conditioner does not require an implementation 
+    Note that a `Conditioner` does not require an implementation 
     for method _transform, since it is dealt with by the transformer.
     However, it does need one for _invert, 
-    since it depends on the implemented conditioner.&#34;&#34;&#34;
+    since it depends on the implemented conditioner.
+
+    Note that `Transformer` exposes a _h_init method that, 
+    if it doesn&#39;t return None, should return an initialization value 
+    for pre-activation parameters h. This is useful to initialize
+    a Flow to the identity transformation, for training stability.
+    For example, if your conditioner returns h as the result 
+    of a feed-forward MLP, you could initialize all weights and biases 
+    as randn() * 1e-3, and the last layer biases as the result of _h_init.
+    &#34;&#34;&#34;
 
 
     conditional = True
@@ -889,6 +930,8 @@ Otherwise, they only return the transformed tensor.</p>
 <p>Note that in training, using forward or backward KL divergence,
 _transform or _invert should be differentiable w.r.t. the flow's parameters,
 respectively. Otherwise, the flow would not learn.</p>
+<p>Remember that it's convenient for training stability to initialize
+the flow so that it performs the identity transformation (or close to it).</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>dim</code></strong> :&ensp;<code>int</code></dt>
@@ -931,6 +974,9 @@ If this flow is in a <code><a title="flow.flow.Sequential" href="#flow.flow.Sequ
     Note that in training, using forward or backward KL divergence,
     _transform or _invert should be differentiable w.r.t. the flow&#39;s parameters,
     respectively. Otherwise, the flow would not learn.
+
+    Remember that it&#39;s convenient for training stability to initialize
+    the flow so that it performs the identity transformation (or close to it).
     &#34;&#34;&#34;
 
     def __init__(self, dim=1, prior=None, **kwargs):
@@ -1082,6 +1128,7 @@ If this flow is in a <code><a title="flow.flow.Sequential" href="#flow.flow.Sequ
 <li><a title="flow.modules.BatchNorm" href="modules.html#flow.modules.BatchNorm">BatchNorm</a></li>
 <li><a title="flow.modules.LeakyReLU" href="modules.html#flow.modules.LeakyReLU">LeakyReLU</a></li>
 <li><a title="flow.modules.LogSigmoid" href="modules.html#flow.modules.LogSigmoid">LogSigmoid</a></li>
+<li><a title="flow.modules.Shuffle" href="modules.html#flow.modules.Shuffle">Shuffle</a></li>
 <li><a title="flow.modules.Sigmoid" href="modules.html#flow.modules.Sigmoid">Sigmoid</a></li>
 <li><a title="flow.modules.Softplus" href="modules.html#flow.modules.Softplus">Softplus</a></li>
 </ul>
@@ -1509,6 +1556,10 @@ def _transform(self, x, *h, log_det=False, **kwargs):
 def _invert(self, x, *h, log_det=False, **kwargs):
     # Transform u into x using parameters h.
     ...
+
+def _h_init(self):
+    # Return initialization values for pre-activation h parameters.
+    ...
 </code></pre>
 <p>Note that forward, _transform and _invert all receive h,
 that contains the parameters for the transformation.</p>
@@ -1516,7 +1567,7 @@ that contains the parameters for the transformation.</p>
 of the required parameters for each dimension in the flow.
 As an example, an Affine transformer has h_dim=2 (loc and scale)
 for each dimension in the flow.</p>
-<p>CAUTION: all three methods need to be general enough
+<p>CAUTION: all the three first methods need to be general enough
 to work with dim=1 or an arbitrary dim,
 since the conditioner might pass any number of dimensions
 to transform depending on how it works.</p></div>
@@ -1551,6 +1602,10 @@ to transform depending on how it works.</p></div>
     def _invert(self, x, *h, log_det=False, **kwargs):
         # Transform u into x using parameters h.
         ...
+
+    def _h_init(self):
+        # Return initialization values for pre-activation h parameters.
+        ...
     ```
 
     Note that forward, _transform and _invert all receive h,
@@ -1561,7 +1616,7 @@ to transform depending on how it works.</p></div>
     As an example, an Affine transformer has h_dim=2 (loc and scale)
     for each dimension in the flow.
 
-    CAUTION: all three methods need to be general enough 
+    CAUTION: all the three first methods need to be general enough 
         to work with dim=1 or an arbitrary dim,
         since the conditioner might pass any number of dimensions
         to transform depending on how it works.
@@ -1624,7 +1679,16 @@ to transform depending on how it works.</p></div>
         raise NotImplementedError()
 
     def _invert(self, u, *h, log_det=False, **kwargs):
-        raise NotImplementedError()</code></pre>
+        raise NotImplementedError()
+
+    def _h_init(self):
+        &#34;&#34;&#34;Return initialization values for pre-activation h parameters.
+        
+        Returns:
+            result: None if no initialization is required or
+                tensor with shape (dim * h_dim,) with the initialization values.
+        &#34;&#34;&#34;
+        return None # by default, no initialization suggested</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">

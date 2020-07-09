@@ -18,54 +18,6 @@ import torch.nn.functional as F
 from .flow import Conditioner
 
 
-def default_net(
-    input_dim, output_dim, n_layers=3,
-    hidden_dim=(100, 50), activation=nn.ReLU, 
-):
-    """Create a basic feed-forward network.
-
-    Args:
-        input_dim (int): input dimensionality.
-        output_dim (int): output dimensionality.
-        n_layers (int): number of layers in the network,
-            counting input and output layers.
-            For example, input + hidden + output is n_layers = 3.
-        hidden_dim (list): list with the dimensionality of each hidden layer.
-            Must contain n_layers - 1 non-negative ints.
-        activation (torch.nn.Module): Module class to instantiate 
-            as activation layer after each linear layer.
-    """
-
-    assert isinstance(hidden_dim, (tuple, list)) 
-    assert len(hidden_dim) == n_layers - 1
-    assert all(isinstance(x, int) and x > 0 for x in hidden_dim)
-
-    def create_layer(n_layer, n_step):
-        if n_step == 0:
-            i = input_dim if n_layer == 0 else hidden_dim[n_layer - 1]
-            o = output_dim if n_layer == n_layers - 1 else hidden_dim[n_layer]
-
-            return nn.Linear(i, o)
-        else:
-            if n_layer == n_layers:
-                return None
-            else:
-                return activation()
-
-    return nn.Sequential(
-        nn.BatchNorm1d(input_dim, affine=False),
-        *(
-            layer
-            for layer in (
-                create_layer(n_layer, n_step)
-                for n_layer in range(n_layers)
-                for n_step in range(2)
-            )
-            if layer is not None
-        )
-    )
-
-
 class ConditionerNet(nn.Module):
     """Conditioner parameters network.
 
@@ -76,23 +28,75 @@ class ConditionerNet(nn.Module):
 
     def __init__(
         self, 
-        input_dim, output_dim, net=default_net, params_init=torch.randn
+        input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, 
+        h_init=None,
     ):
         """
         Args:
             input_dim (int): input dimensionality.
             output_dim (int): output dimensionality. 
                 Total dimension of all parameters combined.
+            hidden_dim (tuple): tuple of positive ints 
+                with the dimensions of each hidden layer.
+            nl (torch.nn.Module): non-linearity module class
+                to use after every linear layer (except the last one).
+            h_init (torch.Tensor): tensor to use as initializer 
+                of the last layer bias. If None, original initialization used.
         """
         super().__init__()
 
         self.input_dim = input_dim
         self.output_dim = output_dim
 
+        if h_init is not None:
+            assert h_init.shape == (output_dim,)
+
         if input_dim:
-            self.net = net(input_dim, output_dim)
+            assert isinstance(hidden_dim, (tuple, list)) 
+            assert all(isinstance(x, int) and x > 0 for x in hidden_dim)
+
+            n_layers = len(hidden_dim) + 1
+
+            def create_layer(n_layer, n_step):
+                if n_step == 0:
+                    i = input_dim if n_layer == 0 else hidden_dim[n_layer - 1]
+                    o = output_dim if n_layer == n_layers - 1 else \
+                        hidden_dim[n_layer]
+
+                    return nn.Linear(i, o)
+                else:
+                    if n_layer == n_layers - 1:
+                        return None
+                    else:
+                        return nl()
+
+            self.net = nn.Sequential(
+                nn.BatchNorm1d(input_dim, affine=False),
+                *(
+                    layer
+                    for layer in (
+                        create_layer(n_layer, n_step)
+                        for n_layer in range(n_layers)
+                        for n_step in range(2)
+                    )
+                    if layer is not None
+                )
+            )
+
+            if h_init is not None:
+                # Initialize all weights and biases to close to 0,
+                # and the last biases to h_init
+                for p in self.net.parameters():
+                    p.data = torch.randn_like(p) * 1e-3
+
+                last_bias = self.net[-1].bias
+                last_bias.data = h_init.to(last_bias.device)
+
         else:
-            self.parameter = nn.Parameter(params_init(1, output_dim))
+            if h_init is None:
+                h_init = torch.randn(output_dim)
+
+            self.parameter = nn.Parameter(h_init.unsqueeze(0))
 
     def forward(self, x):
         """Feed-forward pass."""
@@ -114,16 +118,21 @@ class AutoregressiveNaive(Conditioner):
             trnf (flow.flow.Transformer): 
                 transformer to use alongside this conditioner.
             net (class): torch.nn.Module class that computes the parameters.
-                If None, defaults to `ConditionerNet` with `default_net`.
+                If None, defaults to `ConditionerNet`.
         """
         super().__init__(trnf, **kwargs)
 
         if net is None:
             net = ConditionerNet
 
+        h_init = self.trnf._h_init()
+
         self.nets = nn.ModuleList([
-            net(idim + self.cond_dim, self.trnf.h_dim)
-            for idim in range(self.dim)
+            net(idim + self.cond_dim, self.trnf.h_dim, h_init=init)
+            for idim, init in zip(
+                range(self.dim),
+                (h_init.view(self.dim, -1) if h_init is not None else None)
+            )
         ])
 
     # Override methods
@@ -200,7 +209,7 @@ class MADE_Net(nn.Sequential):
         self, 
         input_dim, output_dim, 
         hidden_sizes_mult=[10, 5], act=nn.ReLU,
-        cond_dim=0
+        cond_dim=0, h_init=None,
     ):
         """
         Args:
@@ -216,7 +225,9 @@ class MADE_Net(nn.Sequential):
             cond_dim (int): dimensionality of the conditioning tensor, if any.
                 non-negative int. If cond_dim > 0, the cond tensor is expected 
                 to be concatenated before the input dimensions.
-        """
+            h_init (torch.Tensor): tensor to use as initializer 
+                of the last layer bias. If None, original initialization used.
+            """
 
         super().__init__()
 
@@ -280,6 +291,13 @@ class MADE_Net(nn.Sequential):
             if act is not None and k < len(m) - 2: # not the last one
                 self.add_module(f'{act.__name__}_{k}', act())
 
+        if h_init is not None:
+            for p in self.parameters():
+                p.data = torch.randn_like(p) * 1e-3
+
+            last_bias = self[-1].bias
+            last_bias.data = h_init.to(last_bias.device)
+
 
 class MADE(Conditioner):
     """Masked Autoregressive flow for Density Estimation.
@@ -299,7 +317,11 @@ class MADE(Conditioner):
 
         super().__init__(trnf, **kwargs)
 
-        self.net = net(self.dim, self.dim * trnf.h_dim, cond_dim=self.cond_dim)
+        self.net = net(
+            self.dim, self.dim * trnf.h_dim, 
+            cond_dim=self.cond_dim,
+            h_init=self.trnf._h_init()
+        )
         
 
     # Overrides:

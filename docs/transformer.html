@@ -101,6 +101,12 @@ class Affine(Transformer):
         else:
             return x
 
+    def _h_init(self):
+        h_init = torch.zeros(self.dim * self.h_dim, device=self.device)
+        h_init[1::2] = softplus_inv(torch.tensor(1. - self.eps)).item()
+
+        return h_init
+
 
 class _IncreasingMonotonicTransformer(Transformer):
     &#34;&#34;&#34;Abstract Transformer that inverts using Bijection Search, 
@@ -252,16 +258,16 @@ class NonAffine(_AdamInvTransformer):
         assert not h.size(1) % self.h_dim
 
         h = h.view(h.size(0), -1, self.h_dim)
-        weight, loc, scale = h[..., :-1:3], h[..., 1:-1:3], h[..., 2:-1:3]
+        loc, scale, log_weight = h[..., :-1:3], h[..., 1:-1:3], h[..., 2:-1:3]
         bias = h[..., -1]
 
         scale = F.softplus(scale) + self.eps
-        weight = F.softplus(weight) + self.eps
+        log_weight = F.log_softmax(log_weight, dim=2)
 
-        return weight, loc, scale, bias
+        return log_weight, loc, scale, bias
 
     def _transform(self, u, *h, log_det=False, **kwargs):
-        weight, loc, scale, bias = h
+        log_weight, loc, scale, bias = h
         z = u.unsqueeze(2) * scale + loc
 
         # We need the derivative of each dimension individually,
@@ -275,18 +281,35 @@ class NonAffine(_AdamInvTransformer):
             log_det_i = log_det_i.view(*shape) # restore shape
 
             log_det_i = log_sum_exp_trick(
-                torch.log(weight) + log_det_i + torch.log(scale)
+                log_weight + log_det_i + torch.log(scale)
             ).sum(dim=1)
         else:
             nl_z = nl_res
 
         nl_z = nl_z.view(*shape) # restore shape
-        x = (nl_z * weight).sum(dim=2) + bias
+        x = (nl_z * torch.exp(log_weight)).sum(dim=2) + bias
 
         if log_det:
             return x, log_det_i
         else:
             return x
+
+    def _h_init(self):
+        h_init = torch.zeros(self.dim, self.h_dim, device=self.device)
+        # loc and bias 0, scale 1
+        # weight can be random, since all components return the same result
+
+        # h_init[:, :-1:3] = 0 # loc
+        h_init[:, 1:-1:3] = softplus_inv(
+            torch.tensor(1. - self.eps)
+        ).item() # scale
+        h_init[:, 2:-1:3] = torch.randn(
+            self.dim, self.h_dim // 3, device=self.device
+        ) # log_weight
+        
+        h_init[:, -1] = 0 # bias
+
+        return h_init.flatten()
 
 
 class DSF(_AdamInvTransformer):
@@ -319,10 +342,10 @@ class DSF(_AdamInvTransformer):
 
         h = h.view(h.size(0), -1, self.h_dim)
 
-        loc, scale, w = h[..., ::3], h[..., 1::3], h[..., 2::3]
+        loc, scale, log_w = h[..., ::3], h[..., 1::3], h[..., 2::3]
         
         scale = F.softplus(scale) + self.eps
-        log_w = F.log_softmax(w, dim=2)
+        log_w = F.log_softmax(log_w, dim=2)
         
         return loc, scale, log_w
 
@@ -368,7 +391,22 @@ class DSF(_AdamInvTransformer):
 
             return u, log_det
         else:
-            return u</code></pre>
+            return u
+
+    def _h_init(self):
+        h_init = torch.zeros(self.dim, self.h_dim, device=self.device)
+        # loc 0, scale 1
+        # weight can be random, since all components return the same result
+
+        # h_init[:, ::3] = 0 # loc
+        h_init[:, 1::3] = softplus_inv(
+            torch.tensor(1. - self.eps)
+        ).item() # scale
+        h_init[:, 2::3] = torch.randn(
+            self.dim, self.h_dim // 3, device=self.device
+        ) # log_weight
+
+        return h_init.flatten()</code></pre>
 </details>
 </section>
 <section>
@@ -441,7 +479,13 @@ class DSF(_AdamInvTransformer):
         if log_det:
             return x, -self._log_det(scale)
         else:
-            return x</code></pre>
+            return x
+
+    def _h_init(self):
+        h_init = torch.zeros(self.dim * self.h_dim, device=self.device)
+        h_init[1::2] = softplus_inv(torch.tensor(1. - self.eps)).item()
+
+        return h_init</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -512,10 +556,10 @@ class DSF(_AdamInvTransformer):
 
         h = h.view(h.size(0), -1, self.h_dim)
 
-        loc, scale, w = h[..., ::3], h[..., 1::3], h[..., 2::3]
+        loc, scale, log_w = h[..., ::3], h[..., 1::3], h[..., 2::3]
         
         scale = F.softplus(scale) + self.eps
-        log_w = F.log_softmax(w, dim=2)
+        log_w = F.log_softmax(log_w, dim=2)
         
         return loc, scale, log_w
 
@@ -561,7 +605,22 @@ class DSF(_AdamInvTransformer):
 
             return u, log_det
         else:
-            return u</code></pre>
+            return u
+
+    def _h_init(self):
+        h_init = torch.zeros(self.dim, self.h_dim, device=self.device)
+        # loc 0, scale 1
+        # weight can be random, since all components return the same result
+
+        # h_init[:, ::3] = 0 # loc
+        h_init[:, 1::3] = softplus_inv(
+            torch.tensor(1. - self.eps)
+        ).item() # scale
+        h_init[:, 2::3] = torch.randn(
+            self.dim, self.h_dim // 3, device=self.device
+        ) # log_weight
+
+        return h_init.flatten()</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -637,16 +696,16 @@ Defaults to <code><a title="flow.modules.LeakyReLU" href="modules.html#flow.modu
         assert not h.size(1) % self.h_dim
 
         h = h.view(h.size(0), -1, self.h_dim)
-        weight, loc, scale = h[..., :-1:3], h[..., 1:-1:3], h[..., 2:-1:3]
+        loc, scale, log_weight = h[..., :-1:3], h[..., 1:-1:3], h[..., 2:-1:3]
         bias = h[..., -1]
 
         scale = F.softplus(scale) + self.eps
-        weight = F.softplus(weight) + self.eps
+        log_weight = F.log_softmax(log_weight, dim=2)
 
-        return weight, loc, scale, bias
+        return log_weight, loc, scale, bias
 
     def _transform(self, u, *h, log_det=False, **kwargs):
-        weight, loc, scale, bias = h
+        log_weight, loc, scale, bias = h
         z = u.unsqueeze(2) * scale + loc
 
         # We need the derivative of each dimension individually,
@@ -660,18 +719,35 @@ Defaults to <code><a title="flow.modules.LeakyReLU" href="modules.html#flow.modu
             log_det_i = log_det_i.view(*shape) # restore shape
 
             log_det_i = log_sum_exp_trick(
-                torch.log(weight) + log_det_i + torch.log(scale)
+                log_weight + log_det_i + torch.log(scale)
             ).sum(dim=1)
         else:
             nl_z = nl_res
 
         nl_z = nl_z.view(*shape) # restore shape
-        x = (nl_z * weight).sum(dim=2) + bias
+        x = (nl_z * torch.exp(log_weight)).sum(dim=2) + bias
 
         if log_det:
             return x, log_det_i
         else:
-            return x</code></pre>
+            return x
+
+    def _h_init(self):
+        h_init = torch.zeros(self.dim, self.h_dim, device=self.device)
+        # loc and bias 0, scale 1
+        # weight can be random, since all components return the same result
+
+        # h_init[:, :-1:3] = 0 # loc
+        h_init[:, 1:-1:3] = softplus_inv(
+            torch.tensor(1. - self.eps)
+        ).item() # scale
+        h_init[:, 2:-1:3] = torch.randn(
+            self.dim, self.h_dim // 3, device=self.device
+        ) # log_weight
+        
+        h_init[:, -1] = 0 # bias
+
+        return h_init.flatten()</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
