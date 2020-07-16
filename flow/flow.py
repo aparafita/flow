@@ -479,7 +479,7 @@ class Transformer(Flow):
         # Transform x into u using parameters h.
         ...
 
-    def _invert(self, x, *h, log_det=False, **kwargs):
+    def _invert(self, u, *h, log_det=False, **kwargs):
         # Transform u into x using parameters h.
         ...
 
