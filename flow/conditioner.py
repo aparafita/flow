@@ -6,6 +6,7 @@ Conditioners implemented in this class:
 * `AutoregressiveNaive`: conditioner defined by a separate network 
     for each dimension. Only use for one-dimensional flows.
 * `MADE`: Masked Autoregressive flow for Density Estimation.
+* `CouplingLayers`: CouplingLayers Conditioner.
 """
 
 import numpy as np
@@ -436,7 +437,7 @@ class CouplingLayers(Conditioner):
 
     def __init__(self, trnf, dim=None, net_kwargs=None, **kwargs):
         """
-        Args: 
+        Args:
             trnf (Transformer): transformer to use on the second split.
             dim (int): dimension of the Conditioner. 
                 Note that its transformer must have dim // 2 dimensionality.

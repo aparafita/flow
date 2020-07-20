@@ -27,6 +27,7 @@
 <li><code><a title="flow.conditioner.AutoregressiveNaive" href="#flow.conditioner.AutoregressiveNaive">AutoregressiveNaive</a></code>: conditioner defined by a separate network
 for each dimension. Only use for one-dimensional flows.</li>
 <li><code><a title="flow.conditioner.MADE" href="#flow.conditioner.MADE">MADE</a></code>: Masked Autoregressive flow for Density Estimation.</li>
+<li><code><a title="flow.conditioner.CouplingLayers" href="#flow.conditioner.CouplingLayers">CouplingLayers</a></code>: CouplingLayers Conditioner.</li>
 </ul>
 <details class="source">
 <summary>
@@ -40,6 +41,7 @@ Conditioners implemented in this class:
 * `AutoregressiveNaive`: conditioner defined by a separate network 
     for each dimension. Only use for one-dimensional flows.
 * `MADE`: Masked Autoregressive flow for Density Estimation.
+* `CouplingLayers`: CouplingLayers Conditioner.
 &#34;&#34;&#34;
 
 import numpy as np
@@ -470,7 +472,7 @@ class CouplingLayers(Conditioner):
 
     def __init__(self, trnf, dim=None, net_kwargs=None, **kwargs):
         &#34;&#34;&#34;
-        Args: 
+        Args:
             trnf (Transformer): transformer to use on the second split.
             dim (int): dimension of the Conditioner. 
                 Note that its transformer must have dim // 2 dimensionality.
@@ -780,10 +782,14 @@ and the transformer one, dim // 2 dimensions.
 As such, the given trnf must have trnf.dim == cond.dim // 2.</p>
 <p>Pass both dimension keyword arguments (Transformer and Conditioner).
 Remember to apply a <code><a title="flow.modules.Shuffle" href="modules.html#flow.modules.Shuffle">Shuffle</a></code> flow before this Conditioner.</p>
-<p>Args:
-trnf (Transformer): transformer to use on the second split.
-dim (int): dimension of the Conditioner.
-Note that its transformer must have dim // 2 dimensionality.</p></div>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>trnf</code></strong> :&ensp;<code>Transformer</code></dt>
+<dd>transformer to use on the second split.</dd>
+<dt><strong><code>dim</code></strong> :&ensp;<code>int</code></dt>
+<dd>dimension of the Conditioner.
+Note that its transformer must have dim // 2 dimensionality.</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -806,7 +812,7 @@ Note that its transformer must have dim // 2 dimensionality.</p></div>
 
     def __init__(self, trnf, dim=None, net_kwargs=None, **kwargs):
         &#34;&#34;&#34;
-        Args: 
+        Args:
             trnf (Transformer): transformer to use on the second split.
             dim (int): dimension of the Conditioner. 
                 Note that its transformer must have dim // 2 dimensionality.
