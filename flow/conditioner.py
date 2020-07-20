@@ -305,7 +305,7 @@ class MADE(Conditioner):
     http://papers.nips.cc/paper/6828-masked-autoregressive-flow-for-density-estimation
     """
         
-    def __init__(self, trnf, net=MADE_Net, **kwargs):
+    def __init__(self, trnf, net=MADE_Net, net_kwargs=None, **kwargs):
         """
         Args:
             trnf (flow.flow.Transformer): 
@@ -317,10 +317,13 @@ class MADE(Conditioner):
 
         super().__init__(trnf, **kwargs)
 
+        net_kwargs = net_kwargs or {}
+
         self.net = net(
             self.dim, self.dim * trnf.h_dim, 
             cond_dim=self.cond_dim,
-            h_init=self.trnf._h_init()
+            h_init=self.trnf._h_init(),
+            **net_kwargs
         )
         
 
@@ -350,3 +353,128 @@ class MADE(Conditioner):
         return self.trnf(u, h, invert=True, log_det=log_det)
 
 # ------------------------------------------------------------------------------
+
+
+from flow.flow import Transformer
+from flow.modules import Shuffle
+
+class _CouplingLayersTransformer(Transformer):
+    """Special Transformer used exclusively by CouplingLayers.
+
+    Since Transformers and Conditioners need to be of the same size
+    and CouplingLayers only passes a subset of dimensions to its Transformer,
+    we need a Transformer that encapsulates the lower-dimensional Transformer.
+
+    This will only transform the second split of dimensions, not the first one,
+    but its dim is the whole dimensionality.
+    """
+    
+    def __init__(self, trnf, dim=None):
+        assert dim is not None and dim in (trnf.dim * 2, trnf.dim * 2 + 1)
+        
+        super().__init__(dim=dim, h_dim=trnf.h_dim)
+
+        self.trnf = trnf
+
+
+    # Overrides
+    def _activation(self, h, **kwargs): 
+        return self.trnf._activation(h, **kwargs)
+
+    def _transform(self, x, *h, log_det=False, **kwargs): 
+        # CouplingLayers will pass the whole Tensor to _transform.
+        assert x.size(1) == self.dim
+
+        x1, x2 = x[:, :self.trnf.dim], x[:, self.trnf.dim:]
+        u1 = x1
+        res2 = self.trnf._transform(x2, *h, log_det=log_det, **kwargs)
+
+        if log_det:
+            u2, log_det = res2
+
+            return torch.cat([u1, u2], 1), log_det
+        else:
+            u2 = res2
+
+            return torch.cat([u1, u2], 1)
+
+    def _invert(self, u2, *h, log_det=False, **kwargs):
+        # CouplingLayers will only pass the transformer split to _invert.
+        assert u2.size(1) == self.trnf.dim
+
+        res2 = self.trnf._invert(u2, *h, log_det=log_det, **kwargs)
+
+        if log_det:
+            x2, log_det = res2
+
+            return x2, log_det
+        else:
+            x2 = res2
+
+            return x2
+
+    def _h_init(self):
+        # Return initialization values for pre-activation h parameters.
+        return self.trnf._h_init()
+
+
+class CouplingLayers(Conditioner):
+    """CouplingLayers.
+
+    https://arxiv.org/abs/1410.8516
+
+    Simple implementation of CouplingLayers, where the tensor is divided 
+    in two splits, one transformed with the identity, 
+    the other with the given transformer. 
+    The identity split has dim - dim // 2 dimensions,
+    and the transformer one, dim // 2 dimensions.
+    As such, the given trnf must have trnf.dim == cond.dim // 2.
+
+    Pass both dimension keyword arguments (Transformer and Conditioner).
+    Remember to apply a `flow.utils.Shuffle` flow before this Conditioner.
+    """
+
+    def __init__(self, trnf, dim=None, net_kwargs=None, **kwargs):
+        """
+        Args: 
+            trnf (Transformer): transformer to use on the second split.
+            dim (int): dimension of the Conditioner. 
+                Note that its transformer must have dim // 2 dimensionality.
+        """
+
+        assert dim is not None and dim >= 2, 'Must pass dim to CouplingLayers'
+        assert trnf.dim == dim // 2
+
+        trnf = _CouplingLayersTransformer(trnf, dim=dim)
+        super().__init__(trnf, dim=dim)
+
+        self.h_net = ConditionerNet(
+            dim - dim // 2 + self.cond_dim, dim // 2 * trnf.h_dim, 
+            h_init=self.trnf._h_init(),
+            **(net_kwargs or {})
+        )
+
+
+    # Overrides
+    def _h(self, x, cond=None, **kwargs): 
+        id_dim = self.dim - self.dim // 2
+        x1 = x[:, :id_dim]
+        
+        return self.h_net(self._prepend_cond(x1, cond))
+
+    def _invert(self, u, cond=None, log_det=False, **kwargs): 
+        id_dim = self.dim - self.dim // 2
+        u1, u2 = u[:, :id_dim], u[:, id_dim:]
+
+        x1 = u1        
+        h = self.h_net(self._prepend_cond(x1, cond))
+        res2 = self.trnf(u2, h, invert=True, log_det=log_det, **kwargs)
+
+        if log_det:
+            x2, log_det = res2
+
+            return torch.cat([x1, x2], 1), log_det
+        else:
+            x2 = res2
+
+            return torch.cat([x1, x2], 1)
