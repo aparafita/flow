@@ -66,8 +66,10 @@ def get_device():
 
 def train(
     flow, trainX, valX, cond_train=None, cond_val=None, loss_f=None,
-    batch_size=32, optimizer=optim.Adam, optimizer_kwargs=dict(lr=1e-3),
-    n_epochs=int(1e6), patience=100, 
+    post_training_f=None, post_validation_f=None,
+    batch_size=32, optimizer=optim.Adam, 
+    optimizer_kwargs=dict(lr=1e-3, weight_decay=1e-3),
+    n_epochs=int(1e6), patience=100, gradient_clipping=None
 ):
     r&#34;&#34;&#34;Train Flow model with (optional) early stopping.
 
@@ -131,6 +133,7 @@ def train(
 
     train_losses, val_losses = [], []
     
+    val_loss = np.inf
     best_loss = np.inf
     best_epoch = 0
     best_model = None
@@ -161,9 +164,29 @@ def train(
                     # Pytorch recipe: zero_grad - backward - step
                     optimizer.zero_grad()
                     loss.backward()
+
+                    # Gradient clipping
+                    if gradient_clipping is not None:
+                        assert gradient_clipping &gt; 0
+                        nn.utils.clip_grad_norm_(
+                            flow.parameters(), 
+                            gradient_clipping
+                        )
+
                     optimizer.step()
                     
                     train_losses.append((epoch + n / len(trainX), loss.item()))
+
+                    tq.set_postfix(OrderedDict(
+                        epoch_progress=&#39;%.3d%%&#39; % (n / len(X) * 100),
+                        train_loss=&#39;%+.3e&#39; % loss.item(), 
+                        last_val_loss=&#39;%+.3e&#39; % val_loss, 
+                        best_epoch=best_epoch, 
+                        best_loss=&#39;%+.3e&#39; % best_loss
+                    ))
+
+                    if post_training_f is not None:
+                        post_training_f(batch, subidx, cond=cond)
                 
                 # Validation
                 flow.eval()
@@ -178,12 +201,15 @@ def train(
                             cond = cond_val[subidx].to(flow.device)
 
                         val_loss += (
-                            loss_f(batch, subidx, cond=cond).sum() / len(X)
-                        ).item()
+                            loss_f(batch, subidx, cond=cond) / len(X)
+                        ).sum().item()
 
                     val_losses.append((epoch, val_loss))
 
-                assert not np.isnan(val_loss) and not np.isinf(val_loss)
+                    if post_validation_f is not None:
+                        post_validation_f()
+
+                assert not np.isnan(val_loss)# and not np.isinf(val_loss)
 
                 # Early stopping
                 if best_loss &gt; val_loss:
@@ -195,9 +221,11 @@ def train(
                     
                 tq.update()
                 tq.set_postfix(OrderedDict(
-                    current_loss=val_loss, 
+                    epoch_progress=&#39;100%&#39;,
+                    train_loss=&#39;%+.3e&#39; % loss.item(), 
+                    last_val_loss=&#39;%+.3e&#39; % val_loss, 
                     best_epoch=best_epoch, 
-                    best_loss=best_loss
+                    best_loss=&#39;%+.3e&#39; % best_loss
                 ))
 
                 if patience and epoch - best_epoch &gt;= patience:
@@ -399,7 +427,7 @@ If int, batch size.</dd>
 </details>
 </dd>
 <dt id="flow.training.train"><code class="name flex">
-<span>def <span class="ident">train</span></span>(<span>flow, trainX, valX, cond_train=None, cond_val=None, loss_f=None, batch_size=32, optimizer=torch.optim.adam.Adam, optimizer_kwargs={'lr': 0.001}, n_epochs=1000000, patience=100)</span>
+<span>def <span class="ident">train</span></span>(<span>flow, trainX, valX, cond_train=None, cond_val=None, loss_f=None, post_training_f=None, post_validation_f=None, batch_size=32, optimizer=torch.optim.adam.Adam, optimizer_kwargs={'lr': 0.001, 'weight_decay': 0.001}, n_epochs=1000000, patience=100, gradient_clipping=None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Train Flow model with (optional) early stopping.</p>
@@ -458,8 +486,10 @@ To avoid using early stopping, set to 0.</dd>
 </summary>
 <pre><code class="python">def train(
     flow, trainX, valX, cond_train=None, cond_val=None, loss_f=None,
-    batch_size=32, optimizer=optim.Adam, optimizer_kwargs=dict(lr=1e-3),
-    n_epochs=int(1e6), patience=100, 
+    post_training_f=None, post_validation_f=None,
+    batch_size=32, optimizer=optim.Adam, 
+    optimizer_kwargs=dict(lr=1e-3, weight_decay=1e-3),
+    n_epochs=int(1e6), patience=100, gradient_clipping=None
 ):
     r&#34;&#34;&#34;Train Flow model with (optional) early stopping.
 
@@ -523,6 +553,7 @@ To avoid using early stopping, set to 0.</dd>
 
     train_losses, val_losses = [], []
     
+    val_loss = np.inf
     best_loss = np.inf
     best_epoch = 0
     best_model = None
@@ -553,9 +584,29 @@ To avoid using early stopping, set to 0.</dd>
                     # Pytorch recipe: zero_grad - backward - step
                     optimizer.zero_grad()
                     loss.backward()
+
+                    # Gradient clipping
+                    if gradient_clipping is not None:
+                        assert gradient_clipping &gt; 0
+                        nn.utils.clip_grad_norm_(
+                            flow.parameters(), 
+                            gradient_clipping
+                        )
+
                     optimizer.step()
                     
                     train_losses.append((epoch + n / len(trainX), loss.item()))
+
+                    tq.set_postfix(OrderedDict(
+                        epoch_progress=&#39;%.3d%%&#39; % (n / len(X) * 100),
+                        train_loss=&#39;%+.3e&#39; % loss.item(), 
+                        last_val_loss=&#39;%+.3e&#39; % val_loss, 
+                        best_epoch=best_epoch, 
+                        best_loss=&#39;%+.3e&#39; % best_loss
+                    ))
+
+                    if post_training_f is not None:
+                        post_training_f(batch, subidx, cond=cond)
                 
                 # Validation
                 flow.eval()
@@ -570,12 +621,15 @@ To avoid using early stopping, set to 0.</dd>
                             cond = cond_val[subidx].to(flow.device)
 
                         val_loss += (
-                            loss_f(batch, subidx, cond=cond).sum() / len(X)
-                        ).item()
+                            loss_f(batch, subidx, cond=cond) / len(X)
+                        ).sum().item()
 
                     val_losses.append((epoch, val_loss))
 
-                assert not np.isnan(val_loss) and not np.isinf(val_loss)
+                    if post_validation_f is not None:
+                        post_validation_f()
+
+                assert not np.isnan(val_loss)# and not np.isinf(val_loss)
 
                 # Early stopping
                 if best_loss &gt; val_loss:
@@ -587,9 +641,11 @@ To avoid using early stopping, set to 0.</dd>
                     
                 tq.update()
                 tq.set_postfix(OrderedDict(
-                    current_loss=val_loss, 
+                    epoch_progress=&#39;100%&#39;,
+                    train_loss=&#39;%+.3e&#39; % loss.item(), 
+                    last_val_loss=&#39;%+.3e&#39; % val_loss, 
                     best_epoch=best_epoch, 
-                    best_loss=best_loss
+                    best_loss=&#39;%+.3e&#39; % best_loss
                 ))
 
                 if patience and epoch - best_epoch &gt;= patience:

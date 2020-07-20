@@ -431,7 +431,7 @@ class CouplingLayers(Conditioner):
     As such, the given trnf must have trnf.dim == cond.dim // 2.
 
     Pass both dimension keyword arguments (Transformer and Conditioner).
-    Remember to apply a `flow.utils.Shuffle` flow before this Conditioner.
+    Remember to apply a `flow.modules.Shuffle` flow before this Conditioner.
     """
 
     def __init__(self, trnf, dim=None, net_kwargs=None, **kwargs):

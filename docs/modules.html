@@ -252,10 +252,6 @@ class LeakyReLU(Flow):
 
 class BatchNorm(Flow):
     &#34;&#34;&#34;Perform BatchNormalization as a Flow class.
-
-    Note that if you want ActNorm, you can set momentum to 0
-    so that batch_statistics only take into account the first batch 
-    passed through the system (including the one from warm_start).
     &#34;&#34;&#34;
 
     def __init__(self, momentum=.1, eps=1e-5, **kwargs):
@@ -263,7 +259,7 @@ class BatchNorm(Flow):
         Args:
             momentum (float): value used for the moving average
                 of batch statistics. Must be between 0 and 1.
-            eps (float): lower-bound for the batch-scale tensor.
+            eps (float): lower-bound for the scale tensor.
         &#34;&#34;&#34;
         super().__init__(**kwargs)
 
@@ -280,65 +276,115 @@ class BatchNorm(Flow):
         self.loc = nn.Parameter(torch.zeros(1, self.dim))
         self.scale = nn.Parameter(torch.zeros(1, self.dim))
 
-    def _update(self, x):
-        assert not self.training or x.size(0) &gt;= 2, \
-            &#39;If training BatchNorm, pass more than 1 sample.&#39;
-
-        with torch.no_grad():
-            bloc = x.mean(0, keepdim=True)
-            bscale = x.std(0, keepdim=True) + self.eps
-
-            if self.updates.data == 0:
-                self.batch_loc = bloc
-                self.batch_scale = bscale
-            else:
-                m = self.momentum
-                self.batch_loc = (1 - m) * self.batch_loc + m * bloc
-                self.batch_scale = (1 - m) * self.batch_scale + m * bscale
-
-            self.updates += 1
-
     def warm_start(self, x):
-        self._update(x)
+        with torch.no_grad():
+            self.batch_loc = x.mean(0, keepdim=True)
+            self.batch_scale = x.std(0, keepdim=True) + self.eps
+
+            self.updates.data = torch.tensor(1).to(self.device)
 
         return self
 
     def _activation(self, x=None, update=None):
-        if update:
-            assert x is not None
-            self._update(x)
+        if self.training:
+            assert x is not None and x.size(0) &gt;= 2, \
+                &#39;If training BatchNorm, pass more than 1 sample.&#39;
 
-        bloc, bscale = self.batch_loc, self.batch_scale
+            bloc = x.mean(0, keepdim=True)
+            bscale = x.std(0, keepdim=True) + self.eps
+
+            # Update self.batch_loc, self.batch_scale
+            with torch.no_grad():
+                if self.updates.data == 0:
+                    self.batch_loc.data = bloc
+                    self.batch_scale.data = bscale
+                else:
+                    m = self.momentum
+                    self.batch_loc.data = (1 - m) * self.batch_loc + m * bloc
+                    self.batch_scale.data = \
+                        (1 - m) * self.batch_scale + m * bscale
+
+                self.updates += 1
+        else:
+            bloc, bscale = self.batch_loc, self.batch_scale
+
         loc, scale = self.loc, self.scale
 
-        # Note that batch_scale does not use activation,
-        # since it should be set by warm_start directly.
         scale = torch.exp(scale) + self.eps
+        # Note that batch_scale does not use activation,
+        # since it is already in scale units.
 
         return bloc, bscale, loc, scale
 
-    def _log_det(self, scale, bscale):
-        return (torch.log(scale) - torch.log(bscale)).sum(dim=1)
+    def _log_det(self, bscale):
+        return (self.scale - torch.log(bscale)).sum(dim=1)
 
     def _transform(self, x, log_det=False, **kwargs):
-        bloc, bscale, loc, scale = self._activation(x, update=self.training)
+        bloc, bscale, loc, scale = self._activation(x)
         u = scale * (x - bloc) / bscale + loc
         
         if log_det:
-            log_det = self._log_det(scale, bscale)
+            log_det = self._log_det(bscale)
             return u, log_det
         else:
             return u
 
     def _invert(self, u, log_det=False, **kwargs):
-        bloc, bscale, loc, scale = self._activation(update=False)
+        assert not self.training, (
+            &#39;If using BatchNorm in reverse training mode, &#39;
+            &#39;remember to call it reversed: inv_flow(BatchNorm)(dim=dim)&#39;
+        )
+
+        bloc, bscale, loc, scale = self._activation()
         x = (u - loc) / scale * bscale + bloc
         
         if log_det:
-            log_det = -self._log_det(scale, bscale)
+            log_det = -self._log_det(bscale)
             return x, log_det
         else:
             return x
+
+
+class ActNorm(Affine):
+    &#34;&#34;&#34;Implementation of Activation Normalization.
+    https://arxiv.org/pdf/1807.03039.pdf
+
+    Uses Affine implementation and provides the warm_start method
+    to initialize Affine so that the transformed distribution
+    has location 0 and variance 1.
+
+    Note that ActNorm expects to call warm_start.
+    An assert blocks using it in any way before warm_start has been called.
+    &#34;&#34;&#34;
+
+    def __init__(self, eps=1e-6, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            eps (float): lower-bound for the weight tensor.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        self.register_buffer(&#39;eps&#39;, torch.tensor(eps))
+        self.register_buffer(&#39;initialized&#39;, torch.tensor(False))
+
+    def warm_start(self, x):
+        &#34;&#34;&#34;Warm start for ActNorm.
+
+        Set loc and weight so that the transformed distribution
+        has location 0 and variance 1.
+        &#34;&#34;&#34;
+
+        self.log_weight.data = -torch.log(x.std(0, keepdim=True) + self.eps)
+        self.bias.data = -(x * torch.exp(self.log_weight)).mean(0, keepdim=True)
+
+        self.initialized.data = torch.tensor(True).to(self.device)
+
+        return self
+
+    def _h(self):
+        assert self.initialized.item()
+
+        return super()._h()
 
 
 class Shuffle(Flow):
@@ -390,6 +436,118 @@ class Shuffle(Flow):
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="flow.modules.ActNorm"><code class="flex name class">
+<span>class <span class="ident">ActNorm</span></span>
+<span>(</span><span>eps=1e-06, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Implementation of Activation Normalization.
+<a href="https://arxiv.org/pdf/1807.03039.pdf">https://arxiv.org/pdf/1807.03039.pdf</a></p>
+<p>Uses Affine implementation and provides the warm_start method
+to initialize Affine so that the transformed distribution
+has location 0 and variance 1.</p>
+<p>Note that ActNorm expects to call warm_start.
+An assert blocks using it in any way before warm_start has been called.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>eps</code></strong> :&ensp;<code>float</code></dt>
+<dd>lower-bound for the weight tensor.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ActNorm(Affine):
+    &#34;&#34;&#34;Implementation of Activation Normalization.
+    https://arxiv.org/pdf/1807.03039.pdf
+
+    Uses Affine implementation and provides the warm_start method
+    to initialize Affine so that the transformed distribution
+    has location 0 and variance 1.
+
+    Note that ActNorm expects to call warm_start.
+    An assert blocks using it in any way before warm_start has been called.
+    &#34;&#34;&#34;
+
+    def __init__(self, eps=1e-6, **kwargs):
+        &#34;&#34;&#34;
+        Args:
+            eps (float): lower-bound for the weight tensor.
+        &#34;&#34;&#34;
+        super().__init__(**kwargs)
+
+        self.register_buffer(&#39;eps&#39;, torch.tensor(eps))
+        self.register_buffer(&#39;initialized&#39;, torch.tensor(False))
+
+    def warm_start(self, x):
+        &#34;&#34;&#34;Warm start for ActNorm.
+
+        Set loc and weight so that the transformed distribution
+        has location 0 and variance 1.
+        &#34;&#34;&#34;
+
+        self.log_weight.data = -torch.log(x.std(0, keepdim=True) + self.eps)
+        self.bias.data = -(x * torch.exp(self.log_weight)).mean(0, keepdim=True)
+
+        self.initialized.data = torch.tensor(True).to(self.device)
+
+        return self
+
+    def _h(self):
+        assert self.initialized.item()
+
+        return super()._h()</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="flow.modules.Affine" href="#flow.modules.Affine">Affine</a></li>
+<li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
+<li>torch.nn.modules.module.Module</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="flow.modules.ActNorm.warm_start"><code class="name flex">
+<span>def <span class="ident">warm_start</span></span>(<span>self, x)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Warm start for ActNorm.</p>
+<p>Set loc and weight so that the transformed distribution
+has location 0 and variance 1.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def warm_start(self, x):
+    &#34;&#34;&#34;Warm start for ActNorm.
+
+    Set loc and weight so that the transformed distribution
+    has location 0 and variance 1.
+    &#34;&#34;&#34;
+
+    self.log_weight.data = -torch.log(x.std(0, keepdim=True) + self.eps)
+    self.bias.data = -(x * torch.exp(self.log_weight)).mean(0, keepdim=True)
+
+    self.initialized.data = torch.tensor(True).to(self.device)
+
+    return self</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="flow.modules.Affine" href="#flow.modules.Affine">Affine</a></b></code>:
+<ul class="hlist">
+<li><code><a title="flow.modules.Affine.cpu" href="flow.html#flow.flow.Flow.cpu">cpu</a></code></li>
+<li><code><a title="flow.modules.Affine.cuda" href="flow.html#flow.flow.Flow.cuda">cuda</a></code></li>
+<li><code><a title="flow.modules.Affine.forward" href="flow.html#flow.flow.Flow.forward">forward</a></code></li>
+<li><code><a title="flow.modules.Affine.nll" href="flow.html#flow.flow.Flow.nll">nll</a></code></li>
+<li><code><a title="flow.modules.Affine.reverse_kl" href="flow.html#flow.flow.Flow.reverse_kl">reverse_kl</a></code></li>
+<li><code><a title="flow.modules.Affine.sample" href="flow.html#flow.flow.Flow.sample">sample</a></code></li>
+<li><code><a title="flow.modules.Affine.to" href="flow.html#flow.flow.Flow.to">to</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
 <dt id="flow.modules.Affine"><code class="flex name class">
 <span>class <span class="ident">Affine</span></span>
 <span>(</span><span>weight=None, bias=None, **kwargs)</span>
@@ -472,6 +630,10 @@ If None, initialized to torch.zeros(1, self.dim).</dd>
 <li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
 <li>torch.nn.modules.module.Module</li>
 </ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="flow.modules.ActNorm" href="#flow.modules.ActNorm">ActNorm</a></li>
+</ul>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
@@ -494,16 +656,13 @@ If None, initialized to torch.zeros(1, self.dim).</dd>
 </code></dt>
 <dd>
 <div class="desc"><p>Perform BatchNormalization as a Flow class.</p>
-<p>Note that if you want ActNorm, you can set momentum to 0
-so that batch_statistics only take into account the first batch
-passed through the system (including the one from warm_start).</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>momentum</code></strong> :&ensp;<code>float</code></dt>
 <dd>value used for the moving average
 of batch statistics. Must be between 0 and 1.</dd>
 <dt><strong><code>eps</code></strong> :&ensp;<code>float</code></dt>
-<dd>lower-bound for the batch-scale tensor.</dd>
+<dd>lower-bound for the scale tensor.</dd>
 </dl></div>
 <details class="source">
 <summary>
@@ -511,10 +670,6 @@ of batch statistics. Must be between 0 and 1.</dd>
 </summary>
 <pre><code class="python">class BatchNorm(Flow):
     &#34;&#34;&#34;Perform BatchNormalization as a Flow class.
-
-    Note that if you want ActNorm, you can set momentum to 0
-    so that batch_statistics only take into account the first batch 
-    passed through the system (including the one from warm_start).
     &#34;&#34;&#34;
 
     def __init__(self, momentum=.1, eps=1e-5, **kwargs):
@@ -522,7 +677,7 @@ of batch statistics. Must be between 0 and 1.</dd>
         Args:
             momentum (float): value used for the moving average
                 of batch statistics. Must be between 0 and 1.
-            eps (float): lower-bound for the batch-scale tensor.
+            eps (float): lower-bound for the scale tensor.
         &#34;&#34;&#34;
         super().__init__(**kwargs)
 
@@ -539,62 +694,70 @@ of batch statistics. Must be between 0 and 1.</dd>
         self.loc = nn.Parameter(torch.zeros(1, self.dim))
         self.scale = nn.Parameter(torch.zeros(1, self.dim))
 
-    def _update(self, x):
-        assert not self.training or x.size(0) &gt;= 2, \
-            &#39;If training BatchNorm, pass more than 1 sample.&#39;
-
-        with torch.no_grad():
-            bloc = x.mean(0, keepdim=True)
-            bscale = x.std(0, keepdim=True) + self.eps
-
-            if self.updates.data == 0:
-                self.batch_loc = bloc
-                self.batch_scale = bscale
-            else:
-                m = self.momentum
-                self.batch_loc = (1 - m) * self.batch_loc + m * bloc
-                self.batch_scale = (1 - m) * self.batch_scale + m * bscale
-
-            self.updates += 1
-
     def warm_start(self, x):
-        self._update(x)
+        with torch.no_grad():
+            self.batch_loc = x.mean(0, keepdim=True)
+            self.batch_scale = x.std(0, keepdim=True) + self.eps
+
+            self.updates.data = torch.tensor(1).to(self.device)
 
         return self
 
     def _activation(self, x=None, update=None):
-        if update:
-            assert x is not None
-            self._update(x)
+        if self.training:
+            assert x is not None and x.size(0) &gt;= 2, \
+                &#39;If training BatchNorm, pass more than 1 sample.&#39;
 
-        bloc, bscale = self.batch_loc, self.batch_scale
+            bloc = x.mean(0, keepdim=True)
+            bscale = x.std(0, keepdim=True) + self.eps
+
+            # Update self.batch_loc, self.batch_scale
+            with torch.no_grad():
+                if self.updates.data == 0:
+                    self.batch_loc.data = bloc
+                    self.batch_scale.data = bscale
+                else:
+                    m = self.momentum
+                    self.batch_loc.data = (1 - m) * self.batch_loc + m * bloc
+                    self.batch_scale.data = \
+                        (1 - m) * self.batch_scale + m * bscale
+
+                self.updates += 1
+        else:
+            bloc, bscale = self.batch_loc, self.batch_scale
+
         loc, scale = self.loc, self.scale
 
-        # Note that batch_scale does not use activation,
-        # since it should be set by warm_start directly.
         scale = torch.exp(scale) + self.eps
+        # Note that batch_scale does not use activation,
+        # since it is already in scale units.
 
         return bloc, bscale, loc, scale
 
-    def _log_det(self, scale, bscale):
-        return (torch.log(scale) - torch.log(bscale)).sum(dim=1)
+    def _log_det(self, bscale):
+        return (self.scale - torch.log(bscale)).sum(dim=1)
 
     def _transform(self, x, log_det=False, **kwargs):
-        bloc, bscale, loc, scale = self._activation(x, update=self.training)
+        bloc, bscale, loc, scale = self._activation(x)
         u = scale * (x - bloc) / bscale + loc
         
         if log_det:
-            log_det = self._log_det(scale, bscale)
+            log_det = self._log_det(bscale)
             return u, log_det
         else:
             return u
 
     def _invert(self, u, log_det=False, **kwargs):
-        bloc, bscale, loc, scale = self._activation(update=False)
+        assert not self.training, (
+            &#39;If using BatchNorm in reverse training mode, &#39;
+            &#39;remember to call it reversed: inv_flow(BatchNorm)(dim=dim)&#39;
+        )
+
+        bloc, bscale, loc, scale = self._activation()
         x = (u - loc) / scale * bscale + bloc
         
         if log_det:
-            log_det = -self._log_det(scale, bscale)
+            log_det = -self._log_det(bscale)
             return x, log_det
         else:
             return x</code></pre>
@@ -1014,6 +1177,12 @@ Default: 20.</dd>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
+<li>
+<h4><code><a title="flow.modules.ActNorm" href="#flow.modules.ActNorm">ActNorm</a></code></h4>
+<ul class="">
+<li><code><a title="flow.modules.ActNorm.warm_start" href="#flow.modules.ActNorm.warm_start">warm_start</a></code></li>
+</ul>
+</li>
 <li>
 <h4><code><a title="flow.modules.Affine" href="#flow.modules.Affine">Affine</a></code></h4>
 </li>
