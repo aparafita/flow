@@ -97,7 +97,7 @@ Real samples|Fake samples (unconditional)|Fake samples (conditional)
 Documentation can be found [here](https://aparafita.github.io/flow)
 
 * Examples: notebook examples in the [examples](examples/) folder.
-* TODO: Tutorials
+* Tutorials: notebook tutorials in [tutorials](tutorials/) folder.
 
 
 # Contributing
