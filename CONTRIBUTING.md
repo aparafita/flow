@@ -3,7 +3,7 @@ Welcome to the Contributors section, thank you for your time!
 
 # Important resources:
 
-* Tutorials
+* [Tutorials](tutorials/)
 * [Examples](examples/)
 * [Documentation](https://aparafita.github.io/flow-torch)
 
@@ -23,3 +23,6 @@ This project is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md) code 
 
 * Faster MADE inversion. For now, exact MADE inversion requires k steps to invert, being k the dimension of the flow.
 	We can use approximate inversion by optimizing the inverted tensor, but the initial point is crucial to results.
+* Stable training with higher dimensional datasets. 
+	When training MNIST, inf/nan losses appear. Got to check if these appear due to unconvenient batches
+	or if the network itself diverges. Gradient clipping / ignoring high loss samples might help?
