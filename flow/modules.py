@@ -224,11 +224,19 @@ class LeakyReLU(Flow):
 
 class BatchNorm(Flow):
     """Perform BatchNormalization as a Flow class.
+
+    If not affine, just learns batch statistics to normalize the input.
     """
 
-    def __init__(self, momentum=.1, eps=1e-5, **kwargs):
+    @property
+    def affine(self):
+        return self._affine.item()
+    
+
+    def __init__(self, affine=True, momentum=.1, eps=1e-5, **kwargs):
         """
         Args:
+            affine (bool): whether to learn parameters loc/scale.
             momentum (float): value used for the moving average
                 of batch statistics. Must be between 0 and 1.
             eps (float): lower-bound for the scale tensor.
@@ -245,8 +253,15 @@ class BatchNorm(Flow):
         self.register_buffer('batch_loc', torch.zeros(1, self.dim))
         self.register_buffer('batch_scale', torch.ones(1, self.dim))
 
+        assert isinstance(affine, bool)
+        self.register_buffer('_affine', torch.tensor(affine))
+
+        # We'll save these two parameters even if _affine is not True
+        # because, otherwise, when we load the flow,
+        # if affine has not the same value as the state_dict, 
+        # it will raise an Exception.
         self.loc = nn.Parameter(torch.zeros(1, self.dim))
-        self.scale = nn.Parameter(torch.zeros(1, self.dim))
+        self.log_scale = nn.Parameter(torch.zeros(1, self.dim))
 
     def warm_start(self, x):
         with torch.no_grad():
@@ -280,7 +295,7 @@ class BatchNorm(Flow):
         else:
             bloc, bscale = self.batch_loc, self.batch_scale
 
-        loc, scale = self.loc, self.scale
+        loc, scale = self.loc, self.log_scale
 
         scale = torch.exp(scale) + self.eps
         # Note that batch_scale does not use activation,
@@ -289,11 +304,16 @@ class BatchNorm(Flow):
         return bloc, bscale, loc, scale
 
     def _log_det(self, bscale):
-        return (self.scale - torch.log(bscale)).sum(dim=1)
+        if self.affine:
+            return (self.log_scale - torch.log(bscale)).sum(dim=1)
+        else:
+            return -torch.log(bscale).sum(dim=1)
 
     def _transform(self, x, log_det=False, **kwargs):
         bloc, bscale, loc, scale = self._activation(x)
-        u = scale * (x - bloc) / bscale + loc
+        u = (x - bloc) / bscale 
+        if self.affine:
+            u = u * scale + loc
         
         if log_det:
             log_det = self._log_det(bscale)
@@ -308,7 +328,10 @@ class BatchNorm(Flow):
         )
 
         bloc, bscale, loc, scale = self._activation()
-        x = (u - loc) / scale * bscale + bloc
+        if self.affine:
+            x = (u - loc) / scale * bscale + bloc
+        else:
+            x = u * bscale + bloc
         
         if log_det:
             log_det = -self._log_det(bscale)

@@ -252,11 +252,19 @@ class LeakyReLU(Flow):
 
 class BatchNorm(Flow):
     &#34;&#34;&#34;Perform BatchNormalization as a Flow class.
+
+    If not affine, just learns batch statistics to normalize the input.
     &#34;&#34;&#34;
 
-    def __init__(self, momentum=.1, eps=1e-5, **kwargs):
+    @property
+    def affine(self):
+        return self._affine.item()
+    
+
+    def __init__(self, affine=True, momentum=.1, eps=1e-5, **kwargs):
         &#34;&#34;&#34;
         Args:
+            affine (bool): whether to learn parameters loc/scale.
             momentum (float): value used for the moving average
                 of batch statistics. Must be between 0 and 1.
             eps (float): lower-bound for the scale tensor.
@@ -273,8 +281,15 @@ class BatchNorm(Flow):
         self.register_buffer(&#39;batch_loc&#39;, torch.zeros(1, self.dim))
         self.register_buffer(&#39;batch_scale&#39;, torch.ones(1, self.dim))
 
+        assert isinstance(affine, bool)
+        self.register_buffer(&#39;_affine&#39;, torch.tensor(affine))
+
+        # We&#39;ll save these two parameters even if _affine is not True
+        # because, otherwise, when we load the flow,
+        # if affine has not the same value as the state_dict, 
+        # it will raise an Exception.
         self.loc = nn.Parameter(torch.zeros(1, self.dim))
-        self.scale = nn.Parameter(torch.zeros(1, self.dim))
+        self.log_scale = nn.Parameter(torch.zeros(1, self.dim))
 
     def warm_start(self, x):
         with torch.no_grad():
@@ -308,7 +323,7 @@ class BatchNorm(Flow):
         else:
             bloc, bscale = self.batch_loc, self.batch_scale
 
-        loc, scale = self.loc, self.scale
+        loc, scale = self.loc, self.log_scale
 
         scale = torch.exp(scale) + self.eps
         # Note that batch_scale does not use activation,
@@ -317,11 +332,16 @@ class BatchNorm(Flow):
         return bloc, bscale, loc, scale
 
     def _log_det(self, bscale):
-        return (self.scale - torch.log(bscale)).sum(dim=1)
+        if self.affine:
+            return (self.log_scale - torch.log(bscale)).sum(dim=1)
+        else:
+            return -torch.log(bscale).sum(dim=1)
 
     def _transform(self, x, log_det=False, **kwargs):
         bloc, bscale, loc, scale = self._activation(x)
-        u = scale * (x - bloc) / bscale + loc
+        u = (x - bloc) / bscale 
+        if self.affine:
+            u = u * scale + loc
         
         if log_det:
             log_det = self._log_det(bscale)
@@ -336,7 +356,10 @@ class BatchNorm(Flow):
         )
 
         bloc, bscale, loc, scale = self._activation()
-        x = (u - loc) / scale * bscale + bloc
+        if self.affine:
+            x = (u - loc) / scale * bscale + bloc
+        else:
+            x = u * bscale + bloc
         
         if log_det:
             log_det = -self._log_det(bscale)
@@ -652,12 +675,15 @@ If None, initialized to torch.zeros(1, self.dim).</dd>
 </dd>
 <dt id="flow.modules.BatchNorm"><code class="flex name class">
 <span>class <span class="ident">BatchNorm</span></span>
-<span>(</span><span>momentum=0.1, eps=1e-05, **kwargs)</span>
+<span>(</span><span>affine=True, momentum=0.1, eps=1e-05, **kwargs)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Perform BatchNormalization as a Flow class.</p>
+<p>If not affine, just learns batch statistics to normalize the input.</p>
 <h2 id="args">Args</h2>
 <dl>
+<dt><strong><code>affine</code></strong> :&ensp;<code>bool</code></dt>
+<dd>whether to learn parameters loc/scale.</dd>
 <dt><strong><code>momentum</code></strong> :&ensp;<code>float</code></dt>
 <dd>value used for the moving average
 of batch statistics. Must be between 0 and 1.</dd>
@@ -670,11 +696,19 @@ of batch statistics. Must be between 0 and 1.</dd>
 </summary>
 <pre><code class="python">class BatchNorm(Flow):
     &#34;&#34;&#34;Perform BatchNormalization as a Flow class.
+
+    If not affine, just learns batch statistics to normalize the input.
     &#34;&#34;&#34;
 
-    def __init__(self, momentum=.1, eps=1e-5, **kwargs):
+    @property
+    def affine(self):
+        return self._affine.item()
+    
+
+    def __init__(self, affine=True, momentum=.1, eps=1e-5, **kwargs):
         &#34;&#34;&#34;
         Args:
+            affine (bool): whether to learn parameters loc/scale.
             momentum (float): value used for the moving average
                 of batch statistics. Must be between 0 and 1.
             eps (float): lower-bound for the scale tensor.
@@ -691,8 +725,15 @@ of batch statistics. Must be between 0 and 1.</dd>
         self.register_buffer(&#39;batch_loc&#39;, torch.zeros(1, self.dim))
         self.register_buffer(&#39;batch_scale&#39;, torch.ones(1, self.dim))
 
+        assert isinstance(affine, bool)
+        self.register_buffer(&#39;_affine&#39;, torch.tensor(affine))
+
+        # We&#39;ll save these two parameters even if _affine is not True
+        # because, otherwise, when we load the flow,
+        # if affine has not the same value as the state_dict, 
+        # it will raise an Exception.
         self.loc = nn.Parameter(torch.zeros(1, self.dim))
-        self.scale = nn.Parameter(torch.zeros(1, self.dim))
+        self.log_scale = nn.Parameter(torch.zeros(1, self.dim))
 
     def warm_start(self, x):
         with torch.no_grad():
@@ -726,7 +767,7 @@ of batch statistics. Must be between 0 and 1.</dd>
         else:
             bloc, bscale = self.batch_loc, self.batch_scale
 
-        loc, scale = self.loc, self.scale
+        loc, scale = self.loc, self.log_scale
 
         scale = torch.exp(scale) + self.eps
         # Note that batch_scale does not use activation,
@@ -735,11 +776,16 @@ of batch statistics. Must be between 0 and 1.</dd>
         return bloc, bscale, loc, scale
 
     def _log_det(self, bscale):
-        return (self.scale - torch.log(bscale)).sum(dim=1)
+        if self.affine:
+            return (self.log_scale - torch.log(bscale)).sum(dim=1)
+        else:
+            return -torch.log(bscale).sum(dim=1)
 
     def _transform(self, x, log_det=False, **kwargs):
         bloc, bscale, loc, scale = self._activation(x)
-        u = scale * (x - bloc) / bscale + loc
+        u = (x - bloc) / bscale 
+        if self.affine:
+            u = u * scale + loc
         
         if log_det:
             log_det = self._log_det(bscale)
@@ -754,7 +800,10 @@ of batch statistics. Must be between 0 and 1.</dd>
         )
 
         bloc, bscale, loc, scale = self._activation()
-        x = (u - loc) / scale * bscale + bloc
+        if self.affine:
+            x = (u - loc) / scale * bscale + bloc
+        else:
+            x = u * bscale + bloc
         
         if log_det:
             log_det = -self._log_det(bscale)
@@ -767,6 +816,21 @@ of batch statistics. Must be between 0 and 1.</dd>
 <li><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></li>
 <li>torch.nn.modules.module.Module</li>
 </ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="flow.modules.BatchNorm.affine"><code class="name">var <span class="ident">affine</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def affine(self):
+    return self._affine.item()</code></pre>
+</details>
+</dd>
+</dl>
 <h3>Inherited members</h3>
 <ul class="hlist">
 <li><code><b><a title="flow.flow.Flow" href="flow.html#flow.flow.Flow">Flow</a></b></code>:
@@ -1188,6 +1252,9 @@ Default: 20.</dd>
 </li>
 <li>
 <h4><code><a title="flow.modules.BatchNorm" href="#flow.modules.BatchNorm">BatchNorm</a></code></h4>
+<ul class="">
+<li><code><a title="flow.modules.BatchNorm.affine" href="#flow.modules.BatchNorm.affine">affine</a></code></li>
+</ul>
 </li>
 <li>
 <h4><code><a title="flow.modules.LeakyReLU" href="#flow.modules.LeakyReLU">LeakyReLU</a></code></h4>
