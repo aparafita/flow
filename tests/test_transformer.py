@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 import torch
 
-from flow.transformer import Affine, NonAffine, DSF
+from flow.transformer import Affine, NonAffine, DSF, Spline
 
 from utils import torch_eq_float, skip_cuda
 
@@ -17,6 +17,7 @@ test_transformers = [
     Affine,
     NonAffine,
     DSF,
+    Spline
 ]
 
 
@@ -25,9 +26,17 @@ test_transformers = [
 def test_shape_and_return_requirements(trnf, dim=2):    
     trnf = trnf(dim=dim)
 
-    x = torch.randn(10, dim)
-    _h = torch.randn(x.size(0), trnf.h_dim * dim)
+    # Generate 10 samples in the appropiate domain for X
+    u = trnf.prior.sample(10) # get them from the transformer's prior
+    
+    # Generate any random pre-activation parameters
+    _h = torch.randn(u.size(0), trnf.h_dim * dim)
     h = trnf._activation(_h)
+
+    # And transform our prior sample to X
+    x = trnf(u, _h, invert=True)
+
+    # We'll use this sample from now on
 
     assert isinstance(h, (tuple, list)), \
         'Parameters returned by _activation need to be set in a tuple'
