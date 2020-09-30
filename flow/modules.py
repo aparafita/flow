@@ -265,16 +265,16 @@ class BatchNorm(Flow):
 
     def warm_start(self, x):
         with torch.no_grad():
-            self.batch_loc = x.mean(0, keepdim=True)
-            self.batch_scale = x.std(0, keepdim=True) + self.eps
+            self.batch_loc.data = x.mean(0, keepdim=True)
+            self.batch_scale.data = x.std(0, keepdim=True) + self.eps
 
             self.updates.data = torch.tensor(1).to(self.device)
 
         return self
 
     def _activation(self, x=None, update=None):
-        if self.training:
-            assert x is not None and x.size(0) >= 2, \
+        if self.training and x is not None:
+            assert x.size(0) >= 2, \
                 'If training BatchNorm, pass more than 1 sample.'
 
             bloc = x.mean(0, keepdim=True)
@@ -282,7 +282,7 @@ class BatchNorm(Flow):
 
             # Update self.batch_loc, self.batch_scale
             with torch.no_grad():
-                if self.updates.data == 0:
+                if self.updates.item() == 0:
                     self.batch_loc.data = bloc
                     self.batch_scale.data = bscale
                 else:
@@ -322,11 +322,6 @@ class BatchNorm(Flow):
             return u
 
     def _invert(self, u, log_det=False, **kwargs):
-        assert not self.training, (
-            'If using BatchNorm in reverse training mode, '
-            'remember to call it reversed: inv_flow(BatchNorm)(dim=dim)'
-        )
-
         bloc, bscale, loc, scale = self._activation()
         if self.affine:
             x = (u - loc) / scale * bscale + bloc

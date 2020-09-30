@@ -69,6 +69,16 @@ class Prior(nn.Module):
         return self.to(torch.device('cuda', index=0))
 
 
+class Uniform(Prior):
+    """Prior for a Uniform(0, 1) distribution."""
+
+    def sample(self, n):
+        return torch.rand(n, self.dim, device=self.device)
+
+    def nll(self, u):
+        return torch.zeros_like(u[:, 0])
+
+
 class Normal(Prior):
     """Prior for a standard Normal distribution."""
 

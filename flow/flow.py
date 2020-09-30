@@ -244,7 +244,7 @@ class Sequential(Flow):
     def _transform(self, x, log_det=False, **kwargs):
         log_det_sum = torch.zeros(1, device=x.device)
         
-        for flow in self.flows:
+        for flow in reversed(self.flows):
             res = flow(x, log_det=log_det, **kwargs)
 
             if log_det:
@@ -263,7 +263,7 @@ class Sequential(Flow):
     def _invert(self, u, log_det=False, **kwargs):
         log_det_sum = torch.zeros(1, device=u.device)
 
-        for flow in reversed(self.flows):
+        for flow in self.flows:
             res = flow(u, invert=True, log_det=log_det, **kwargs)
 
             if log_det:
@@ -379,7 +379,9 @@ class Conditioner(Flow):
         dim = trnf.dim
         assert kwargs.pop('dim', dim) == dim
 
-        super().__init__(dim=dim, **kwargs)
+        prior = kwargs.pop('prior', trnf.prior)
+
+        super().__init__(dim=dim, prior=prior, **kwargs)
 
         self.trnf = trnf
         assert cond_dim >= 0

@@ -15,6 +15,7 @@ from torch import nn, optim
 import torch.nn.functional as F
 
 from .flow import Transformer
+from .prior import Uniform
 from .modules import LogSigmoid, LeakyReLU, softplus_inv
 from .utils import *
 
@@ -148,7 +149,7 @@ class _AdamInvTransformer(Transformer):
         self.inv_steps = inv_steps
         self.inv_init = inv_init
 
-    def _invert(self, u, *h, log_det=False, **kwargs):
+    def _invert(self, u, *h, log_det=False, inv_init=None, **kwargs):
         # _invert should be called inside a torch.no_grad(), 
         # since this operation will not be invertible
         with torch.no_grad():
@@ -160,7 +161,11 @@ class _AdamInvTransformer(Transformer):
                 if isinstance(v, torch.Tensor):
                     kwargs[k] = v.clone()
 
-            if self.inv_init is None:
+            if inv_init is not None:
+                # Broadcast
+                x = inv_init.repeat(u.size(0) // inv_init.size(0), 1)
+                assert x.shape == u.shape
+            elif self.inv_init is None:
                 x = nn.Parameter(torch.randn_like(u))
             else:
                 x = nn.Parameter(self.inv_init(u, *h, **kwargs))
@@ -373,3 +378,164 @@ class DSF(_AdamInvTransformer):
         ) # log_weight
 
         return h_init.flatten()
+
+
+class Spline(Transformer):
+    """Neural Spline Flow, implemented for the quadratic case.
+    
+    Models distributions from and to the unit hypercube [0, 1]^K. 
+    Apply a Sigmoid + Affine flow before and after 
+    to transform it back to the real line.
+    
+    Based on https://arxiv.org/pdf/1808.03856.pdf
+
+    Defaults to a Uniform prior.
+    """
+    
+    @property
+    def K(self):
+        return self._K.item()
+    
+    def __init__(self, K=20, eps=1e-3, **kwargs):
+        assert isinstance(K, int) and K >= 2
+
+        prior = kwargs.pop('prior', Uniform(dim=kwargs.get('dim', 1)))
+        
+        # How many parameters? K for the widths (not considering 0 and 1)
+        # and K + 1 for each cut output value.
+        h_dim = 2 * K + 1
+        super().__init__(h_dim=h_dim, prior=prior, **kwargs)
+        
+        self.register_buffer('_K', torch.tensor(int(K)))
+        self.register_buffer('eps', torch.tensor(eps))
+        
+    def _activation(self, h, **kwargs): 
+        h = h.view(h.size(0), self.dim, self.h_dim)
+        
+        heights, widths = h[..., 0::2], h[..., 1::2]
+        widths = torch.softmax(widths, -1)
+        
+        heights = torch.exp(heights) / (
+            (
+                torch.exp(heights[..., :-1]) + 
+                torch.exp(heights[..., 1:])
+            ) / 2 * widths
+        ).sum(-1, keepdim=True)
+
+        return widths.flatten(1), heights.flatten(1)
+
+    def _h_init(self):
+        h = torch.randn(self.dim, self.h_dim, device=self.device) * 1e-1
+        
+        # heights = h[0::2], which should be all 1s -> 0 pre
+        # widths = h[1::2], which should be all 1 / K -> 0 pre
+        
+        return h.flatten()
+    
+    def _lerp(self, a, b, x):
+        return (b - a) * x + a
+    
+    def _log_det(self, heights, bins, alpha):
+        return torch.log(self._lerp(
+            (heights[..., :-1] * bins).sum(-1),
+            (heights[..., 1:] * bins).sum(-1),
+            alpha
+        )).sum(1)
+
+    def _preprocess_h(self, widths, heights):
+        widths, heights = tuple(
+            h.view(h.size(0), self.dim, -1) 
+            for h in [widths, heights]
+        )
+
+        cuts = torch.cat([
+            torch.zeros_like(widths[..., :1]), 
+            torch.cumsum(widths, -1),
+        ], -1)
+
+        return widths, heights, cuts
+
+    def _transform(self, x, widths, heights, log_det=False, **kwargs): 
+        x = x.clamp(self.eps / 2, 1 - self.eps / 2)
+
+        widths, heights, cuts = self._preprocess_h(widths, heights)
+
+        # Transform x into u using parameters h.
+        x = x.unsqueeze(-1)
+        bins = (cuts[..., :-1] <= x) & (x < cuts[..., 1:])
+        
+        alpha = (x.squeeze(-1) - (bins * cuts[..., :-1]).sum(-1)) / \
+            (bins * widths).sum(-1)
+        
+        u = alpha * (widths * bins).sum(-1) * (
+            .5 * alpha * (heights[..., 1:] * bins).sum(-1) +
+            (1 - .5 * alpha) * (heights[..., :-1] * bins).sum(-1)
+        ) + (
+            ((heights[..., :-1] + heights[..., 1:]) / 2.) * 
+            widths * (x >= cuts[..., 1:])
+        ).sum(-1)
+
+        u = u.clamp(self.eps / 2, 1 - self.eps / 2)
+        
+        if log_det:
+            return u, self._log_det(heights, bins, alpha)
+        else:
+            return u
+
+    def _invert(self, u, widths, heights, log_det=False, **kwargs):
+        u = u.clamp(self.eps / 2, 1 - self.eps / 2)
+
+        widths, heights, cuts = self._preprocess_h(widths, heights)
+
+        # Transform u into x using parameters h.
+        u = u.unsqueeze(-1)
+        
+        y_cuts = torch.cumsum(
+            widths * (heights[..., 1:] + heights[..., :-1]) / 2,
+            -1
+        )
+        
+        y_cuts = torch.cat([
+            torch.zeros_like(y_cuts[..., :1]),
+            y_cuts
+        ], -1)
+        
+        bins = (y_cuts[..., :-1] <= u) & (u < y_cuts[..., 1:])
+        
+        a = .5 * (widths * (heights[..., 1:] - heights[..., :-1]) * bins).sum(-1)
+        b = (heights[..., :-1] * widths * bins).sum(-1)
+        c = (
+            ((heights[..., :-1] + heights[..., 1:]) / 2.) * 
+            widths * (u >= y_cuts[..., 1:])
+        ).sum(-1) - u.squeeze(-1)
+        
+        # Note that a can be 0 for flat segments
+        x = torch.zeros_like(u.squeeze(-1))
+        idx = a == 0
+        x[idx] = -c[idx] / b[idx]
+        idx = ~idx
+        
+        disc = b ** 2 - 4 * a * c
+        assert (disc[idx] >= 0.).all().item()
+        sq = torch.sqrt(disc)
+        
+        alpha1 = (-b + sq) / (2 * a)
+        alpha2 = (-b - sq) / (2 * a)
+        
+        alpha = torch.zeros_like(alpha1)
+        alpha[idx] = torch.where(
+            (0 <= alpha1) & (alpha1 <= 1), 
+            alpha1, 
+            alpha2
+        )[idx]
+        
+        x[idx] = (
+            alpha * (widths * bins).sum(-1) + (cuts[..., :-1] * bins).sum(-1)
+        )[idx]
+
+        x = x.clamp(self.eps / 2, 1 - self.eps / 2)
+        
+        if log_det:
+            return x, -self._log_det(heights, bins, alpha)
+        else:
+            return x

@@ -132,7 +132,11 @@ class AutoregressiveNaive(Conditioner):
             net(idim + self.cond_dim, self.trnf.h_dim, h_init=init)
             for idim, init in zip(
                 range(self.dim),
-                (h_init.view(self.dim, -1) if h_init is not None else None)
+                (
+                    h_init.view(self.dim, -1) 
+                    if h_init is not None 
+                    else [None] * self.dim
+                )
             )
         ])
 
@@ -148,20 +152,23 @@ class AutoregressiveNaive(Conditioner):
                 i <= x.size(1) - self.cond_dim
         ], dim=1)
 
-    def _invert(self, u, cond=None, log_det=False):
+    def _invert(self, u, cond=None, log_det=False, **kwargs):
         x = u[:, :0] # (n, 0) tensor
         
         # Invert dimension per dimension sequentially
+        log_det_i = torch.zeros_like(u[:, 0])
         for i, net in enumerate(self.nets):
             # Obtain h_i from previously computed x
             h_i = self._h(x, cond=cond, start=i)
-            x_i = self.trnf(u[:, [i]], h_i, invert=True)
+            x_i = self.trnf(u[:, [i]], h_i, invert=True, log_det=log_det)
+            if log_det:
+                x_i, log_det_i2 = x_i
+                log_det_i = log_det_i + log_det_i2
+
             x = torch.cat([x, x_i], 1)
 
         if log_det:
-            h = self._h(x, cond=cond)
-            _, log_det = self.trnf(u, h, log_det=True, invert=True)
-            return x, log_det
+            return x, log_det_i
         else:
             return x
 
@@ -329,7 +336,7 @@ class MADE(Conditioner):
         
 
     # Overrides:
-    def _h(self, x, cond=None, **kwargs):
+    def _h(self, x, cond=None):
         return self.net(self._prepend_cond(x, cond))
 
     def _invert(self, u, log_det=False, cond=None, **kwargs):
@@ -345,13 +352,14 @@ class MADE(Conditioner):
                     u[:, [i]], 
                     h_i[:, self.trnf.h_dim * i : self.trnf.h_dim * (i + 1)], 
                     invert=True, 
-                    log_det=False
+                    log_det=False,
+                    **kwargs
                 )
 
         # Run again, this time to get the gradient and log_det if required
         h = self.net(x) # now we can compute for all dimensions
         
-        return self.trnf(u, h, invert=True, log_det=log_det)
+        return self.trnf(u, h, invert=True, log_det=log_det, **kwargs)
 
 # ------------------------------------------------------------------------------
 
