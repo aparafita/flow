@@ -106,6 +106,15 @@ class ConditionerNet(nn.Module):
         else:
             return self.parameter.repeat(x.size(0), 1) # n == batch size
 
+    def warm_start(self, x, **kwargs):
+        if self.input_dim:
+            bn = self.net[0] # BatchNorm
+
+            bn.running_mean.data = x.mean(0)
+            bn.running_var.data = x.var(0)
+
+        return self
+
 
 class AutoregressiveNaive(Conditioner):
     """Naive Autoregressive Conditioner.
@@ -171,6 +180,15 @@ class AutoregressiveNaive(Conditioner):
             return x, log_det_i
         else:
             return x
+
+    def warm_start(self, x, cond=None, **kwargs):
+        super().warm_start(x, cond=cond, **kwargs)
+
+        x = self._prepend_cond(x, cond)
+        for i, net in enumerate(self.nets):
+            net.warm_start(x[:, :self.cond_dim + i])
+
+        return self
 
 
 # MADE
@@ -254,6 +272,8 @@ class MADE_Net(nn.Sequential):
         assert isinstance(cond_dim, int) and cond_dim >= 0
         self.cond_dim = cond_dim
 
+        self.add_module(nn.BatchNorm1d(cond_dim + input_dim))
+
         # Add all layers to the Sequential module
         # Define mask connectivity
         m = [ 
@@ -305,6 +325,14 @@ class MADE_Net(nn.Sequential):
 
             last_bias = self[-1].bias
             last_bias.data = h_init.to(last_bias.device)
+
+    def warm_start(self, x, **kwargs):
+        bn = self[0]
+
+        bn.running_mean = x.mean(0)
+        bn.running_var = x.var(0)
+
+        return self
 
 
 class MADE(Conditioner):
@@ -361,6 +389,13 @@ class MADE(Conditioner):
         
         return self.trnf(u, h, invert=True, log_det=log_det, **kwargs)
 
+    def warm_start(self, x, cond=None, **kwargs):
+        super().warm_start(x, cond=cond, **kwargs)
+        x = self._prepend_cond(torch.randn_like(u), cond)
+
+        self.net.warm_start(x, **kwargs)
+
+        return self
 # ------------------------------------------------------------------------------
 
 
@@ -487,3 +522,13 @@ class CouplingLayers(Conditioner):
             x2 = res2
 
             return torch.cat([x1, x2], 1)
+
+    def warm_start(self, x, cond=None, **kwargs):
+        super().warm_start(x, cond=cond, **kwargs)
+
+        id_dim = self.dim - self.dim // 2
+        x1 = x[:, :id_dim]
+        x1 = self._prepend_cond(x1, cond)
+        self.h_net.warm_start(x1, **kwargs)
+
+        return self

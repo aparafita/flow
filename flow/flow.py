@@ -239,6 +239,9 @@ class Sequential(Flow):
         super().__init__(dim=dim, **kwargs)
         self.flows = nn.ModuleList(flows) # save flows in ModuleList
 
+    def append(self, flow):
+        assert flow.dim == self.dim
+        self.flows.append(flow)
 
     # Method overrides
     def _transform(self, x, log_det=False, **kwargs):

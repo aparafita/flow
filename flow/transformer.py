@@ -396,7 +396,7 @@ class Spline(Transformer):
     def K(self):
         return self._K.item()
     
-    def __init__(self, K=20, eps=1e-3, **kwargs):
+    def __init__(self, K=20, eps=1e-6, **kwargs):
         assert isinstance(K, int) and K >= 2
 
         prior = kwargs.pop('prior', Uniform(dim=kwargs.get('dim', 1)))
@@ -516,7 +516,7 @@ class Spline(Transformer):
         idx = ~idx
         
         disc = b ** 2 - 4 * a * c
-        assert (disc[idx] >= 0.).all().item()
+        disc = disc.clamp_min(0.) # avoid numerical error
         sq = torch.sqrt(disc)
         
         alpha1 = (-b + sq) / (2 * a)

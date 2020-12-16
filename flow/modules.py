@@ -66,11 +66,91 @@ class Affine(Flow):
         else:
             return x
 
+class Scaler(Flow):
+    """Scaler Flow. Transforms by multiplying by a positive scale dim-wise."""
+
+    def __init__(self, eps=1e-6, **kwargs):
+        """
+        Args:
+            eps (float): lower-bound to the scale parameter.
+        """
+        super().__init__(**kwargs)
+
+        assert eps > 0
+        self.eps = eps
+        
+        self.logscale = nn.Parameter(torch.randn(1, self.dim))
+
+    def _log_det(self, x):
+        return self.logscale.sum(1)
+    
+    @property
+    def scale(self):
+        return torch.exp(self.logscale) + self.eps
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = x * self.scale
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = u / self.scale
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x 
+
+    def warm_start(self, x, cond=None, **kwargs):
+        super().warm_start(x, cond=cond, **kwargs)
+
+        self.logscale.data = torch.log(x.std(0, keepdim=True))
+
+        return self
+
+
+class Exponential(Flow):
+    """Exponential Flow"""
+
+    def __init__(self, eps=1e-6, **kwargs):
+        """
+        Args:
+            eps (float): lower-bound to the scale parameter.
+        """
+        super().__init__(**kwargs)
+
+        assert eps > 0
+        self.eps = eps
+
+    def _log_det(self, x):
+        return x.sum(1)
+
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = torch.exp(x) + self.eps
+
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs):
+        x = torch.log(u.clamp(self.eps))
+
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x 
+
 
 class Sigmoid(Flow):
     """Sigmoid Flow."""
 
-    def __init__(self, alpha=1., eps=1e-2, **kwargs):
+    def __init__(self, alpha=1., eps=1e-6, **kwargs):
         r"""
         Args:
             alpha (float): alpha parameter for the sigmoid function: 
@@ -233,7 +313,7 @@ class BatchNorm(Flow):
         return self._affine.item()
     
 
-    def __init__(self, affine=True, momentum=.1, eps=1e-5, **kwargs):
+    def __init__(self, affine=True, momentum=.1, eps=1e-6, **kwargs):
         """
         Args:
             affine (bool): whether to learn parameters loc/scale.
@@ -263,7 +343,7 @@ class BatchNorm(Flow):
         self.loc = nn.Parameter(torch.zeros(1, self.dim))
         self.log_scale = nn.Parameter(torch.zeros(1, self.dim))
 
-    def warm_start(self, x):
+    def warm_start(self, x, **kwargs):
         with torch.no_grad():
             self.batch_loc.data = x.mean(0, keepdim=True)
             self.batch_scale.data = x.std(0, keepdim=True) + self.eps
@@ -357,7 +437,7 @@ class ActNorm(Affine):
         self.register_buffer('eps', torch.tensor(eps))
         self.register_buffer('initialized', torch.tensor(False))
 
-    def warm_start(self, x):
+    def warm_start(self, x, **kwargs):
         """Warm start for ActNorm.
 
         Set loc and weight so that the transformed distribution

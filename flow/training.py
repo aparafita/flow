@@ -16,7 +16,7 @@ from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 import torch
 from torch import nn, optim
@@ -32,9 +32,10 @@ def get_device():
 def train(
     flow, trainX, valX, cond_train=None, cond_val=None, loss_f=None,
     post_training_f=None, post_validation_f=None,
+    train_size=1., val_size=1., 
     batch_size=32, optimizer=optim.Adam, 
     optimizer_kwargs=dict(lr=1e-3, weight_decay=1e-3),
-    n_epochs=int(1e6), patience=100, gradient_clipping=None
+    n_epochs=int(1e6), patience=100, gradient_clipping=None,
 ):
     r"""Train Flow model with (optional) early stopping.
 
@@ -83,6 +84,18 @@ def train(
     assert isinstance(flow, Flow)
     assert flow.prior is not None, 'flow.prior is required'
 
+    if isinstance(train_size, float):
+        assert 0. < train_size and train_size <= 1.
+        train_size = int(train_size * len(trainX))
+    else:
+        train_size = min(len(trainX), train_size)
+
+    if isinstance(val_size, float):
+        assert 0. < val_size and val_size <= 1.
+        val_size = int(val_size * len(valX))
+    else:
+        val_size = min(len(valX), val_size)
+
     conditional = cond_train is not None or cond_val is not None
     if conditional:
         assert (cond_train is not None and cond_val is not None), \
@@ -108,17 +121,18 @@ def train(
 
     best_model = TemporaryFile()
 
-    try:
-        with tqdm(n_epochs, leave=True, position=0) as tq:
+    try:        
+        with tqdm() as tq:
             for epoch in range(1, n_epochs + 1):
                 # Train
                 flow.train()
                 X = trainX
-                idx = torch.randperm(len(X), device=X.device)
-                for n in range(0, len(X), batch_size):
-                    if len(X) - n == 1: continue
+                idx = torch.randperm(len(X), device=X.device)[:train_size]
+                for n in range(0, train_size, batch_size):
+                    if train_size - n == 1: continue
                     subidx = idx[n:n + batch_size]
                     batch = X[subidx].to(flow.device)
+                    
                     if conditional:
                         cond = cond_train[subidx].to(flow.device)
 
@@ -140,15 +154,14 @@ def train(
 
                     optimizer.step()
                     
-                    train_losses.append((epoch + n / len(trainX), loss.item()))
+                    train_losses.append((epoch + n / train_size, loss.item()))
 
-                    tq.set_postfix(OrderedDict(
-                        epoch_progress='%.3d%%' % (n / len(X) * 100),
-                        train_loss='%+.3e' % loss.item(), 
-                        last_val_loss='%+.3e' % val_loss, 
-                        best_epoch=best_epoch, 
-                        best_loss='%+.3e' % best_loss
-                    ))
+                    tq.set_postfix(
+                        OrderedDict(
+                            progress='%.3d%%' % (n / train_size * 100), 
+                            best='[%d: %.3f]' % (best_epoch, best_loss)
+                        )
+                    )
 
                     if post_training_f is not None:
                         post_training_f(batch, subidx, cond=cond)
@@ -156,17 +169,18 @@ def train(
                 # Validation
                 flow.eval()
                 X = valX
-                idx = torch.randperm(len(X), device=X.device)
+                idx = torch.randperm(len(X), device=X.device)[:val_size]
                 with torch.no_grad(): # won't accumulate info about gradient
                     val_loss = 0.
-                    for n in range(0, len(X), batch_size):
+                    for n in range(0, val_size, batch_size):
                         subidx = idx[n:n + batch_size]
                         batch = X[subidx].to(flow.device)
+                        
                         if conditional:
                             cond = cond_val[subidx].to(flow.device)
 
                         val_loss += (
-                            loss_f(batch, subidx, cond=cond) / len(X)
+                            loss_f(batch, subidx, cond=cond) / val_size
                         ).sum().item()
 
                     val_losses.append((epoch, val_loss))
@@ -185,13 +199,12 @@ def train(
                     torch.save(flow.state_dict(), best_model)
                     
                 tq.update()
-                tq.set_postfix(OrderedDict(
-                    epoch_progress='100%',
-                    train_loss='%+.3e' % loss.item(), 
-                    last_val_loss='%+.3e' % val_loss, 
-                    best_epoch=best_epoch, 
-                    best_loss='%+.3e' % best_loss
-                ))
+                tq.set_postfix(
+                    OrderedDict(
+                        progress='100%', 
+                        best='[%d: %.3f]' % (best_epoch, best_loss)
+                    )
+                )
 
                 if patience and epoch - best_epoch >= patience:
                     break

@@ -42,6 +42,7 @@ softplus = lambda x, eps=1e-6, **kwargs: F.softplus(x, **kwargs) + eps
 
 def softplus_inv(x, eps=1e-6, threshold=20.):
     """Compute the softplus inverse."""
+    x = x.clamp(0.)
     y = torch.zeros_like(x)
 
     idx = x < threshold
