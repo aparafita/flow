@@ -150,7 +150,7 @@ class Exponential(Flow):
 class Sigmoid(Flow):
     """Sigmoid Flow."""
 
-    def __init__(self, alpha=1., eps=1e-6, **kwargs):
+    def __init__(self, alpha=1., eps=1e-3, **kwargs):
         r"""
         Args:
             alpha (float): alpha parameter for the sigmoid function: 
