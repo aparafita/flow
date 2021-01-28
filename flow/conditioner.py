@@ -17,6 +17,51 @@ from torch import nn
 import torch.nn.functional as F
 
 from .flow import Conditioner
+from .utils import MultiHeadNet
+
+
+def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=None):
+    assert isinstance(hidden_dim, (tuple, list)) 
+    assert all(isinstance(x, int) and x > 0 for x in hidden_dim)
+
+    n_layers = len(hidden_dim) + 1
+
+    def create_layer(n_layer, n_step):
+        if n_step == 0:
+            i = input_dim if n_layer == 0 else hidden_dim[n_layer - 1]
+            o = output_dim if n_layer == n_layers - 1 else \
+                hidden_dim[n_layer]
+
+            return nn.Linear(i, o)
+        else:
+            if n_layer == n_layers - 1:
+                return None
+            else:
+                return nl()
+
+    net = nn.Sequential(
+        nn.BatchNorm1d(input_dim, affine=False),
+        *(
+            layer
+            for layer in (
+                create_layer(n_layer, n_step)
+                for n_layer in range(n_layers)
+                for n_step in range(2)
+            )
+            if layer is not None
+        )
+    )
+
+    if init is not None:
+        # Initialize all weights and biases to close to 0,
+        # and the last biases to init
+        for p in net.parameters():
+            p.data = torch.randn_like(p) * 1e-3
+
+        last_bias = net[-1].bias
+        last_bias.data = init.to(last_bias.device)
+        
+    return net
 
 
 class ConditionerNet(nn.Module):
@@ -29,8 +74,7 @@ class ConditionerNet(nn.Module):
 
     def __init__(
         self, 
-        input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, 
-        h_init=None,
+        input_dim, output_dim, net_f=None, h_init=None,
     ):
         """
         Args:
@@ -51,48 +95,12 @@ class ConditionerNet(nn.Module):
 
         if h_init is not None:
             assert h_init.shape == (output_dim,)
-
+            
+        if net_f is None:
+            net_f = _basic_net
+            
         if input_dim:
-            assert isinstance(hidden_dim, (tuple, list)) 
-            assert all(isinstance(x, int) and x > 0 for x in hidden_dim)
-
-            n_layers = len(hidden_dim) + 1
-
-            def create_layer(n_layer, n_step):
-                if n_step == 0:
-                    i = input_dim if n_layer == 0 else hidden_dim[n_layer - 1]
-                    o = output_dim if n_layer == n_layers - 1 else \
-                        hidden_dim[n_layer]
-
-                    return nn.Linear(i, o)
-                else:
-                    if n_layer == n_layers - 1:
-                        return None
-                    else:
-                        return nl()
-
-            self.net = nn.Sequential(
-                nn.BatchNorm1d(input_dim, affine=False),
-                *(
-                    layer
-                    for layer in (
-                        create_layer(n_layer, n_step)
-                        for n_layer in range(n_layers)
-                        for n_step in range(2)
-                    )
-                    if layer is not None
-                )
-            )
-
-            if h_init is not None:
-                # Initialize all weights and biases to close to 0,
-                # and the last biases to h_init
-                for p in self.net.parameters():
-                    p.data = torch.randn_like(p) * 1e-3
-
-                last_bias = self.net[-1].bias
-                last_bias.data = h_init.to(last_bias.device)
-
+            self.net = net_f(input_dim, output_dim, init=h_init)
         else:
             if h_init is None:
                 h_init = torch.randn(output_dim)
@@ -108,7 +116,8 @@ class ConditionerNet(nn.Module):
 
     def warm_start(self, x, **kwargs):
         if self.input_dim:
-            bn = self.net[0] # BatchNorm
+            bn = self.net[0]
+            assert bn.__class__.__name__.startswith('BatchNorm')
 
             bn.running_mean.data = x.mean(0)
             bn.running_var.data = x.var(0)
@@ -122,7 +131,7 @@ class AutoregressiveNaive(Conditioner):
     Implements a separate network for each dimension's h parameters.
     """
 
-    def __init__(self, trnf, net=None, **kwargs):
+    def __init__(self, trnf, net_f=None, head_slices=[], **kwargs):
         """
         Args:
             trnf (flow.flow.Transformer): 
@@ -131,14 +140,16 @@ class AutoregressiveNaive(Conditioner):
                 If None, defaults to `ConditionerNet`.
         """
         super().__init__(trnf, **kwargs)
-
-        if net is None:
-            net = ConditionerNet
+        
+        if head_slices:
+            assert net_f is None
+            from functools import partial
+            net_f = partial(MultiHeadNet, head_slices=head_slices, use_dropout=False, use_bn=False)
 
         h_init = self.trnf._h_init()
 
         self.nets = nn.ModuleList([
-            net(idim + self.cond_dim, self.trnf.h_dim, h_init=init)
+            ConditionerNet(idim + self.cond_dim, self.trnf.h_dim, h_init=init, net_f=net_f)
             for idim, init in zip(
                 range(self.dim),
                 (

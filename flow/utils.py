@@ -6,6 +6,7 @@ from functools import wraps
 
 import numpy as np
 import torch
+from torch import nn
 import torch.nn.functional as F
 
 
@@ -122,3 +123,138 @@ def monotonic_increasing_bijective_search(
             break
 
     return u
+
+
+class MultiHeadNet(nn.Module):
+    
+    def __init__(self, input_dim, output_dim, head_slices=[], use_dropout=True, use_bn=True, init=None):            
+        assert (
+            isinstance(head_slices, (list, tuple, set)) and 
+            all(isinstance(s, slice) for s in head_slices)
+        )
+        
+        super().__init__()
+        
+        self.head_slices = head_slices
+        
+        self.register_buffer('indexer', torch.ones(1, input_dim, dtype=bool))
+        for s in head_slices:
+            self.indexer[:, s] = False
+            
+        head_dims = [ self.indexer[:, s].size(1) for s in head_slices ]
+        net_dim = input_dim - sum(head_dims)
+        
+        if net_dim:
+            self.net = nn.Sequential(
+                nn.BatchNorm1d(net_dim, affine=False),
+                nn.Linear(net_dim, 100),
+                *((nn.Dropout(),) if use_dropout else tuple()),
+                nn.ReLU(),
+                *((nn.BatchNorm1d(100, affine=False),) if use_bn else tuple()),
+            )
+        else:
+            self.net = Parameter(torch.randn(1, 100))
+                
+        combinations = [ max(d, 2) for d in head_dims ]
+        
+        def combs(lens):
+            if not lens:
+                yield []
+            else:
+                for i in range(lens[0]):
+                    for rest in combs(lens[1:]):
+                        yield [i] + rest
+                        
+        def onehot(comb, lens):
+            res = []
+            
+            for c, l in zip(comb, lens):
+                res += [ c == i for i in range(l) ]
+                
+            return res
+        
+        self.register_buffer('combinations', torch.Tensor([
+            onehot(comb, combinations)
+            for comb in combs(combinations)
+        ]).int())
+        
+        self.heads = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(100, 50),
+                *((nn.Dropout(),) if use_dropout else tuple()),
+                nn.ReLU(),
+                *((nn.BatchNorm1d(50, affine=False),) if use_bn else tuple()),
+                nn.Linear(50, output_dim)
+            )
+            for i in range(max(1, len(self.combinations))) # if there's no combinations,
+            # leave one head to act as the default net
+        ])
+        
+        if init is not None:
+            # Initialize all weights and biases to close to 0,
+            # and the last biases to init
+            for p_it in [self.net.parameters()] + [h.parameters() for h in self.heads]:
+                for p in p_it:
+                    p.data = torch.randn_like(p) * 1e-3
+
+            for head in self.heads:
+                last_bias = head[-1].bias
+                last_bias.data = init.to(last_bias.device)
+        
+        
+    # To override:
+    def forward(self, x):
+        n = x.size(0)
+        
+        if self.combinations.numel(): # any combination at all?
+            comb = (torch.cat([
+                t if t.size(1) > 1 else torch.cat([1 - t, t], 1)
+                for t in (x[:, s] for s in self.head_slices)
+            ], 1) > .5).int()
+
+            comb_idx = torch.arange(len(self.combinations)).view(1, -1).repeat(n, 1)[
+                (comb.unsqueeze(1) == self.combinations.unsqueeze(0)).all(2)
+            ]
+
+            assert len(comb_idx.shape) == 1
+        else:
+            comb_idx = torch.zeros_like(x[:, 0]).int()
+        
+        x = x[self.indexer.repeat(n, 1)].view(n, -1) # remove comb
+        x = self.net(x)
+        
+        results = []
+        for i in torch.unique(comb_idx):
+            idx = comb_idx == i
+            head = self.heads[i]
+            
+            # It may be the case that when restricting to this comb,
+            # there's only 1 or 0 samples. 
+            # BatchNorm would raise an Exception in that case
+            # since it's in training mode, so we'll skip this problem
+            # by moving it to eval if this is the case, only for this evaluation.
+            eval_bn = head.training and idx.sum(0).item() < 2
+            if eval_bn:
+                for layer in head:
+                    if layer.__class__.__name__.startswith('BatchNorm'):
+                        layer.eval()
+            
+            results.append((idx, head(x[idx])))
+            
+            if eval_bn:
+                head.train() # reset BatchNorm's training status
+            
+        assert len({xi.size(1) for _, xi in results}) == 1
+        result = torch.zeros(x.size(0), results[0][1].size(1), device=x.device)
+        for idx, x in results:
+            result[idx] = x
+                    
+        return result
+    
+    def warm_start(self, x):
+        bn = self.net[0] # BatchNorm
+
+        bn.running_mean.data = x.mean(0)
+        bn.running_var.data = x.var(0)
+
+        return self
