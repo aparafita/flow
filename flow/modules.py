@@ -7,7 +7,7 @@ import torch
 from torch import nn
 
 from .flow import Flow
-from .utils import softplus, softplus_inv, logsigmoid
+from .utils import softplus, softplus_inv, logsigmoid, cache, cache_only_in_eval
 
 
 class Affine(Flow):
@@ -66,6 +66,88 @@ class Affine(Flow):
         else:
             return x
 
+@cache_only_in_eval
+class Linear(Flow):
+    """Invertible Linear Flow based on LU decomposition."""
+    
+    def __init__(self, *args, eps=1e-3, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        d = self.dim
+        
+        self.bias = nn.Parameter(torch.randn(d) * .1)
+        
+        self._L_flat = nn.Parameter(torch.randn(d * (d - 1) // 2) * .1)
+        
+        U_flat = torch.randn(d * (d + 1) // 2) * .1
+        U_flat[[i == j for i in range(d) for j in range(i, d)]] += 1
+        self._U_flat = nn.Parameter(U_flat)
+        
+        self.register_buffer('eps', torch.tensor(eps))
+        
+        self.tril = torch.tril_indices(d, d, offset=-1, device=self.device)
+        self.triu = torch.triu_indices(d, d, device=self.device)
+        
+    @cache
+    def L(self):
+        d = self.dim
+        
+        L = torch.eye(d, device=self.device)
+        L[self.tril[0], self.tril[1]] = self._L_flat
+        
+        return L
+        
+    @cache
+    def U(self):
+        d = self.dim
+        
+        U = torch.zeros(d, d, device=self.device)
+        U[self.triu[0], self.triu[1]] = self._U_flat
+        
+        return U + torch.diag(torch.sign(torch.diag(U)) * self.eps)
+    
+    @cache
+    def A(self):
+        return self.L @ self.U
+        
+    @cache
+    def inv(self):
+        inv, _ = torch.triangular_solve(
+            torch.eye(self.dim, device=self.device), self.L, upper=False, 
+            unitriangular=True
+        )
+        
+        inv, _ = torch.triangular_solve(
+            inv, self.U, upper=True, unitriangular=False
+        )
+        
+        return inv
+    
+    def _log_det(self, x, L, U):
+        return torch.log(torch.abs(torch.diag(U))).sum().repeat(x.size(0))
+    
+    def _transform(self, x, log_det=False, **kwargs): 
+        # Transforms x into u. Used for training.
+        L, U = self.L, self.U
+            
+        u = (L @ (U @ x.t())).t() + self.bias
+        
+        if log_det:
+            return u, self._log_det(x, L, U)
+        else:
+            return u
+            
+    def _invert(self, u, log_det=False, **kwargs): 
+        # Transforms u into x. Used for sampling.
+        L, U, inv = self.L, self.U, self.inv
+        x = (inv @ (u - self.bias).t()).t()
+        
+        if log_det:
+            return x, -self._log_det(x, L, U)
+        else:
+            return x
+        
+
 class Scaler(Flow):
     """Scaler Flow. Transforms by multiplying by a positive scale dim-wise."""
 
@@ -111,6 +193,38 @@ class Scaler(Flow):
         self.logscale.data = torch.log(x.std(0, keepdim=True))
 
         return self
+    
+    
+class Power(Flow):
+    """Power Flow (|x|^a * sign(x))"""
+    
+    def __init__(self, power=None, eps=1e-3, **kwargs):
+        assert isinstance(power, (int, float)) and abs(power) > eps
+        
+        super().__init__(**kwargs)
+        
+        self.register_buffer('power', torch.tensor(float(power)))
+        self.register_buffer('eps', torch.tensor(eps))
+        
+    def _log_det(self, x):
+        return (torch.log(torch.abs(self.power)) + (self.power - 1) * torch.log(x.abs() + self.eps)).sum(1)
+    
+    # Override methods
+    def _transform(self, x, log_det=False, **kwargs):
+        u = torch.pow(x.abs(), self.power) * torch.sign(x)
+        
+        if log_det:
+            return u, self._log_det(x)
+        else:
+            return u
+        
+    def _invert(self, u, log_det=False, **kwargs):
+        x = torch.pow(u.abs(), 1 / self.power) * torch.sign(u)
+        
+        if log_det:
+            return x, -self._log_det(x)
+        else:
+            return x
 
 
 class Exponential(Flow):
@@ -392,6 +506,7 @@ class BatchNorm(Flow):
     def _transform(self, x, log_det=False, **kwargs):
         bloc, bscale, loc, scale = self._activation(x)
         u = (x - bloc) / bscale 
+        
         if self.affine:
             u = u * scale + loc
         
@@ -403,6 +518,7 @@ class BatchNorm(Flow):
 
     def _invert(self, u, log_det=False, **kwargs):
         bloc, bscale, loc, scale = self._activation()
+        
         if self.affine:
             x = (u - loc) / scale * bscale + bloc
         else:
@@ -473,6 +589,7 @@ class Shuffle(Flow):
                 
         assert perm.shape == (self.dim,)
         self.register_buffer('perm', perm)
+        self.register_buffer('inv_perm', torch.argsort(self.perm))
         
     def _log_det(self, x):
         # By doing a permutation, det is always 1 or -1. 
@@ -488,8 +605,7 @@ class Shuffle(Flow):
             return u
         
     def _invert(self, u, log_det=False, **kwargs):
-        inv_perm = torch.argsort(self.perm)
-        x = u[:, inv_perm]
+        x = u[:, self.inv_perm]
         
         if log_det:
             return x, -self._log_det(x)

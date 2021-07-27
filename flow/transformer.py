@@ -16,7 +16,7 @@ import torch.nn.functional as F
 
 from .flow import Transformer
 from .prior import Uniform
-from .modules import LogSigmoid, LeakyReLU, softplus_inv
+from .modules import LogSigmoid, LeakyReLU
 from .utils import *
 
 
@@ -380,14 +380,181 @@ class DSF(_AdamInvTransformer):
         return h_init.flatten()
 
 
-class Spline(Transformer):
+class RQ_Spline(Transformer):
+    """Neural Spline Flow, implemented for the rational quadratic case.
+    
+    Based on https://arxiv.org/pdf/1906.04032.pdf
+    """
+    
+    @property
+    def K(self):
+        return self._K.item()
+    
+    @property
+    def width(self):
+        return self.B - self.A
+    
+    def __init__(self, K=20, eps=1e-3, A=0., B=1., **kwargs):
+        assert isinstance(K, int) and K >= 2
+        assert A < B
+
+        dim = kwargs.pop('dim', 1)
+        prior = kwargs.pop('prior', Uniform(dim=dim))
+        
+        # How many parameters? K for widths and heights, K - 1 for derivatives
+        h_dim = 3 * K - 1
+        super().__init__(h_dim=h_dim, prior=prior, dim=dim, **kwargs)
+        
+        self.register_buffer('_K', torch.tensor(int(K)))
+        self.register_buffer('A', torch.tensor(float(A)))
+        self.register_buffer('B', torch.tensor(float(B)))
+        self.register_buffer('eps', torch.tensor(eps))
+        
+    def _activation(self, h, **kwargs): 
+        h = h.view(h.size(0), -1, self.h_dim)
+        
+        widths, heights, derivatives = h[..., 0::3], h[..., 1::3], h[..., 2::3]
+        
+        widths = (self.eps + (1 - self.eps * self.K) * torch.softmax(widths, -1)) * self.width
+        heights = (self.eps + (1 - self.eps * self.K) * torch.softmax(heights, -1)) * self.width
+        derivatives = torch.nn.functional.softplus(derivatives) + self.eps
+        
+        xknots = torch.cat(
+            [torch.zeros_like(widths[..., :1]), torch.cumsum(widths, -1)], -1
+        ) + self.A
+        yknots = torch.cat(
+            [torch.zeros_like(heights[..., :1]), torch.cumsum(heights, -1)], -1
+        ) + self.A
+        
+        derivatives = torch.cat([
+            torch.ones_like(derivatives[..., :1]),
+            derivatives,
+            torch.ones_like(derivatives[..., :1])
+        ], -1)
+        
+        s = (yknots[..., 1:] - yknots[..., :-1]) / (xknots[..., 1:] - xknots[..., :-1])
+        
+        return widths, heights, derivatives, xknots, yknots, s
+
+    def _h_init(self):
+        h = torch.randn(self.dim, self.h_dim, device=self.device) * 1e-1
+        
+        # heights = h[0::3], which should be all 1s -> 0 pre
+        # widths = h[1::3], which should be all 1 / K -> 0 pre
+        # derivatives = h[2::3], which should be 1 -> softplus^-1(1 - self.eps)
+        
+        h[..., 2::3] += softplus_inv(1. - self.eps)
+        
+        return h.flatten()
+    
+    def _transform(self, x, widths, heights, derivatives, xknots, yknots, s, log_det=False, **kwargs):
+        # In/out of window (A, B)
+        idx = (self.A <= x) & (x < self.B)
+        u = torch.zeros_like(x)
+        u[~idx] = x[~idx]
+
+        # Transform x into u using parameters h
+        bins = ((xknots[..., :-1] <= x.unsqueeze(-1)) & (x.unsqueeze(-1) < xknots[..., 1:])).float()
+
+        xk, xk1 = (xknots[..., :-1] * bins).sum(-1), (xknots[..., 1:] * bins).sum(-1)
+        yk, yk1 = (yknots[..., :-1] * bins).sum(-1), (yknots[..., 1:] * bins).sum(-1)
+        dk, dk1 = (derivatives[..., :-1] * bins).sum(-1), (derivatives[..., 1:] * bins).sum(-1)
+        sk = (s * bins).sum(-1)
+
+        # Note that we can get to nans if x was outside bounds.
+        # Filter all these terms to idx:
+        x = x[idx]
+        xk = xk[idx]
+        xk1 = xk1[idx]
+        yk = yk[idx]
+        yk1 = yk1[idx]
+        dk = dk[idx]
+        dk1 = dk1[idx]
+        sk = sk[idx]
+        
+        e = ((x - xk) / (xk1 - xk))
+
+        u[idx] = (yk + (
+            (yk1 - yk) * (sk * e ** 2 + dk * e * (1 - e))
+        ) / (
+            sk + (dk1 + dk - 2 * sk) * e * (1 - e)
+        ))
+        
+        if log_det:
+            log_det = torch.zeros_like(u)
+            log_det[idx] = (
+                (
+                    2 * torch.log(sk) + torch.log(
+                        dk1 * e ** 2 + 2 * sk * e * (1 - e) + dk * (1 - e) ** 2
+                    )
+                ) - (
+                    2 * torch.log(sk + (dk1 + dk - 2 * sk) * e * (1 - e))
+                )
+            )
+            log_det = log_det.sum(1)
+            assert log_det.shape == (u.size(0),)
+            
+            return u, log_det
+        else:
+            return u
+
+    def _invert(self, u, widths, heights, derivatives, xknots, yknots, s, log_det=False, **kwargs):
+        # In/out of window (-B, B)
+        idx = (self.A <= u) & (u < self.B)
+        x = torch.zeros_like(u)
+        x[~idx] = u[~idx]
+
+        # Transform x into u using parameters h
+        bins = ((yknots[..., :-1] <= u.unsqueeze(-1)) & (u.unsqueeze(-1) < yknots[..., 1:])).float()
+
+        xk, xk1 = (xknots[..., :-1] * bins).sum(-1), (xknots[..., 1:] * bins).sum(-1)
+        yk, yk1 = (yknots[..., :-1] * bins).sum(-1), (yknots[..., 1:] * bins).sum(-1)
+        dk, dk1 = (derivatives[..., :-1] * bins).sum(-1), (derivatives[..., 1:] * bins).sum(-1)
+        sk = (s * bins).sum(-1)
+        
+        # Note that we can get to nans if x was outside bounds.
+        # Filter all these terms to idx:
+        u = u[idx]
+        xk = xk[idx]
+        xk1 = xk1[idx]
+        yk = yk[idx]
+        yk1 = yk1[idx]
+        dk = dk[idx]
+        dk1 = dk1[idx]
+        sk = sk[idx]
+
+        a = (yk1 - yk) * (sk - dk) + (u - yk) * (dk1 + dk - 2 * sk)
+        b = (yk1 - yk) * dk - (u - yk) * (dk1 + dk - 2 * sk)
+        c = -sk * (u - yk)
+
+        e = 2 * c / (-b - torch.sqrt(b ** 2 - 4 * a * c))
+        x[idx] = (e * (xk1 - xk) + xk)
+        
+        if log_det:
+            log_det = torch.zeros_like(x)
+            log_det[idx] = (
+                (
+                    2 * torch.log(sk) + torch.log(
+                        dk1 * e ** 2 + 2 * sk * e * (1 - e) + dk * (1 - e) ** 2
+                    )
+                ) - (
+                    2 * torch.log(sk + (dk1 + dk - 2 * sk) * e * (1 - e))
+                )
+            )
+            log_det = log_det.sum(1)
+            assert log_det.shape == (x.size(0),)
+            
+            return x, -log_det
+        else:
+            return x
+
+
+class Q_Spline(Transformer):
     """Neural Spline Flow, implemented for the quadratic case.
     
     Models distributions from and to the unit hypercube [0, 1]^K. 
     Apply a Sigmoid + Affine flow before and after 
     to transform it back to the real line.
-    
-    Based on https://arxiv.org/pdf/1808.03856.pdf
 
     Defaults to a Uniform prior.
     """

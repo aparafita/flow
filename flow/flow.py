@@ -17,9 +17,10 @@ import torch
 from torch import nn
 
 from .prior import Normal as NormalPrior
+from .utils import Module
 
 
-class Flow(nn.Module):
+class Flow(Module):
     r"""Base abstract class for any Flow. 
 
     A Flow represents a diffeomorphic T such that U = T(X),
@@ -71,7 +72,6 @@ class Flow(nn.Module):
             assert prior.dim == dim
         
         self.prior = prior
-        self.device = torch.device('cpu')
 
 
     def forward(self, t, invert=False, log_det=False, **kwargs):
@@ -166,29 +166,6 @@ class Flow(nn.Module):
         return loglk_u - log_det - loglk_x
 
 
-    # Device overrides
-    def _update_device(self, device):
-        """Update saved device for this flow and all its subcomponents."""
-        if self.prior is not None:
-            self.prior._update_device(device)
-
-        self.device = device
-
-    def to(self, device):
-        """Override .to(device) so as to call _update_device(device)."""
-        self._update_device(device)
-
-        return super().to(device)
-
-    def cpu(self):
-        """Override .cpu so as to call .to method."""
-        return self.to(torch.device('cpu'))
-
-    def cuda(self):
-        """Override .cuda so as to call .to method."""
-        return self.to(torch.device('cuda', index=0))
-
-
 def inv_flow(flow_cls, name=None):
     """Transform a Flow class so that _transform and _invert are swapped.
     
@@ -239,6 +216,13 @@ class Sequential(Flow):
         super().__init__(dim=dim, **kwargs)
         self.flows = nn.ModuleList(flows) # save flows in ModuleList
 
+    # Device overrides
+    def _update_device(self, device):
+        super()._update_device(device)
+        
+        for flow in self.flows:
+            flow.device = device
+
     def append(self, flow):
         assert flow.dim == self.dim
         self.flows.append(flow)
@@ -247,7 +231,7 @@ class Sequential(Flow):
     def _transform(self, x, log_det=False, **kwargs):
         log_det_sum = torch.zeros(1, device=x.device)
         
-        for flow in reversed(self.flows):
+        for flow in self.flows:
             res = flow(x, log_det=log_det, **kwargs)
 
             if log_det:
@@ -266,7 +250,7 @@ class Sequential(Flow):
     def _invert(self, u, log_det=False, **kwargs):
         log_det_sum = torch.zeros(1, device=u.device)
 
-        for flow in self.flows:
+        for flow in reversed(self.flows):
             res = flow(u, invert=True, log_det=log_det, **kwargs)
 
             if log_det:
@@ -316,15 +300,9 @@ class Sequential(Flow):
     def __iter__(self):
         for flow in self.flows:
             yield flow
-
-
-    # Device overrides
-    def _update_device(self, device):
-        # Also call all its subflows _update_device(device) methods
-        for flow in self.flows:
-            flow._update_device(device)
-
-        return super()._update_device(device)
+            
+    def __len__(self):
+        return len(self.flows)
 
 
 class Conditioner(Flow):
@@ -435,29 +413,39 @@ class Conditioner(Flow):
         raise NotImplementedError()
 
 
-    # Utilities
-    def _prepend_cond(self, x, cond=None):
-        """Return torch.cat([cond, x], 1), broadcasting cond if necessary.
+def dec_trnf_1d(func):
+    from functools import wraps
     
-        If cond is None, does nothing to x. Useful to avoid checking for cond
-        and preprocessing it every time.
-        """
-        if cond is None:
-            return x
-        else:
-            if cond.size(0) < x.size(0):
-                cond = cond.repeat(x.size(0) // cond.size(0), 1)
+    @wraps(func)
+    def f(self, x, *args, **kwargs):
+        t = []
+        
+        log_det = kwargs.get('log_det', False)
+        log_det_sum = 0
+        
+        for d in range(x.size(1)):
+            res = func(
+                self, x[:, [d]],
+                # all args are assumed to be tensors
+                *(a[:, [d]] for a in args), 
+                **kwargs
+            )
             
-            assert cond.size(0) == x.size(0)
-            return torch.cat([cond, x], 1)
-
-
-    # Device overrides
-    # Extend _update_device to also call it for its transformer.
-    def _update_device(self, device):
-        self.trnf._update_device(device)
-
-        return super()._update_device(device)
+            if log_det:
+                t_i, log_det_i = res
+                log_det_sum += log_det_i
+            else:
+                t_i = res
+                
+            t.append(t_i)
+            
+        t = torch.cat(t, 1)
+        if log_det:
+            return t, log_det_sum
+        else:
+            return t
+        
+    return f
 
 
 class Transformer(Flow):

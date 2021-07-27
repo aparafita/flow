@@ -15,8 +15,10 @@ import numpy as np
 import torch
 from torch import nn
 
+from .utils import Module
 
-class Prior(nn.Module):
+
+class Prior(Module):
     """Prior class to encapsule distribution prior for variable U.
 
     Any class that inherits from Prior needs to implement:
@@ -29,7 +31,12 @@ class Prior(nn.Module):
         # Return the Negative Log-Likelihood (nll) of each sample in u.
         ...
     ```
+    
+    Also, set the class attribute `discrete` indicating 
+    whether the distribution is discrete or not. Defaults to False.
     """
+    
+    discrete = False
 
     def __init__(self, dim=1):
         """
@@ -39,7 +46,6 @@ class Prior(nn.Module):
         super().__init__()
 
         self.dim = dim
-        self.device = torch.device('cpu')
 
     def sample(self, n):
         """Sample n samples from this prior, mapped to the prior device."""
@@ -48,25 +54,6 @@ class Prior(nn.Module):
     def nll(self, u):
         """Return the negative log-likelihood of samples u."""
         raise NotImplementedError()
-
-    # Device overrides
-    def _update_device(self, device):
-        """Update saved device for this prior."""
-        self.device = device
-
-    def to(self, device):
-        """Override .to(device) so as to call _update_device(device)."""
-        self._update_device(device)
-
-        return super().to(device)
-
-    def cpu(self):
-        """Override .cpu so as to call .to method."""
-        return self.to(torch.device('cpu'))
-
-    def cuda(self):
-        """Override .cuda so as to call .to method."""
-        return self.to(torch.device('cuda', index=0))
 
 
 class Uniform(Prior):
@@ -87,3 +74,19 @@ class Normal(Prior):
 
     def nll(self, u):
         return .5 * (self.dim * np.log(2 * np.pi) + (u ** 2).sum(dim=1))
+    
+    
+class Exponential(Prior):
+    """Prior for a Exponential(1) distribution."""
+    
+    def __init__(self, *args, eps=1e-3, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.register_buffer('eps', torch.tensor(eps))
+    
+    def sample(self, n):
+        u = torch.rand(n, 1, device=self.device).clip(self.eps / 2, 1 - self.eps / 2)
+        return -torch.log(u)
+    
+    def nll(self, u):
+        return u.sum(1)

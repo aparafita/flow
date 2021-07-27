@@ -9,34 +9,25 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+from torch_utils import Module
+from torch_utils.prob import log_sum_exp_trick, log_mean_exp_trick
+from torch_utils.dec import cache, cache_only_in_eval
 
-def log_sum_exp_trick(x, log_w=None, dim=-1, keepdim=False):
-    """Compute log(sum(w * exp(x), dim=dim, keepdim=keepdim)) safely.
 
-    Uses the logsumexp trick for the computation of this quantity.
+def prepend_cond(x, cond=None):
+    """Return torch.cat([cond, x], 1), broadcasting cond if necessary.
+
+    If cond is None, does nothing to x. Useful to avoid checking for cond
+    and preprocessing it every time.
     """
-    if log_w is None:
-        log_w = torch.zeros_like(x)
+    if cond is None:
+        return x
+    else:
+        if cond.size(0) < x.size(0):
+            cond = cond.repeat(x.size(0) // cond.size(0), 1)
 
-    x = x + log_w # this way we include w in the computation of M
-
-    M = x.max(dim=dim, keepdim=True).values
-    x = torch.log(torch.exp(x - M).sum(dim=dim, keepdim=True)) + M
-    
-    if not keepdim:
-        x = x.squeeze(dim=dim)
-
-    return x
-
-
-def log_mean_exp_trick(x, dim=-1, keepdim=False):
-    """Computes log(mean(exp(x), dim=dim, keepdim=keepdim)) safely.
-
-    Uses the logsumexp trick for the computation of this quantity.
-    """
-    N = x.size(dim)
-
-    return log_sum_exp_trick(x, dim=dim, keepdim=keepdim) - np.log(N)
+        assert cond.size(0) == x.size(0)
+        return torch.cat([cond, x], 1)
 
 
 softplus = lambda x, eps=1e-6, **kwargs: F.softplus(x, **kwargs) + eps
@@ -125,7 +116,7 @@ def monotonic_increasing_bijective_search(
     return u
 
 
-class MultiHeadNet(nn.Module):
+class MultiHeadNet(Module):
     
     def __init__(self, input_dim, output_dim, head_slices=[], use_dropout=True, use_bn=True, init=None):            
         assert (
@@ -200,6 +191,12 @@ class MultiHeadNet(nn.Module):
             for head in self.heads:
                 last_bias = head[-1].bias
                 last_bias.data = init.to(last_bias.device)
+                
+    def _update_device(self, device):
+        super()._update_device(device)
+        
+        for head in self.heads:
+            head.device = device
         
         
     # To override:

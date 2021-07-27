@@ -17,7 +17,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from .flow import Conditioner
-from .utils import MultiHeadNet
+from .utils import Module, MultiHeadNet, prepend_cond
 
 
 def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=None):
@@ -64,7 +64,7 @@ def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=Non
     return net
 
 
-class ConditionerNet(nn.Module):
+class ConditionerNet(Module):
     """Conditioner parameters network.
 
     Used to compute the parameters h passed to a transformer.
@@ -74,17 +74,19 @@ class ConditionerNet(nn.Module):
 
     def __init__(
         self, 
-        input_dim, output_dim, net_f=None, h_init=None,
+        input_dim, output_dim, net_f, h_init=None,
     ):
         """
         Args:
             input_dim (int): input dimensionality.
             output_dim (int): output dimensionality. 
                 Total dimension of all parameters combined.
-            hidden_dim (tuple): tuple of positive ints 
-                with the dimensions of each hidden layer.
-            nl (torch.nn.Module): non-linearity module class
-                to use after every linear layer (except the last one).
+            net_f (function): function net_f(input_dim, output_dim, init=None)
+                that creates a network with the given input and output dimensions,
+                and possibly receives an init Tensor that,
+                when not None, indicates that the function should be set 
+                so that it always return that tensor. 
+                This helps in initializing a tensor to the identity.
             h_init (torch.Tensor): tensor to use as initializer 
                 of the last layer bias. If None, original initialization used.
         """
@@ -95,9 +97,6 @@ class ConditionerNet(nn.Module):
 
         if h_init is not None:
             assert h_init.shape == (output_dim,)
-            
-        if net_f is None:
-            net_f = _basic_net
             
         if input_dim:
             self.net = net_f(input_dim, output_dim, init=h_init)
@@ -114,7 +113,7 @@ class ConditionerNet(nn.Module):
         else:
             return self.parameter.repeat(x.size(0), 1) # n == batch size
 
-    def warm_start(self, x, **kwargs):
+    def warm_start(self, x, **kwargs):           
         if self.input_dim:
             bn = self.net[0]
             assert bn.__class__.__name__.startswith('BatchNorm')
@@ -131,20 +130,17 @@ class AutoregressiveNaive(Conditioner):
     Implements a separate network for each dimension's h parameters.
     """
 
-    def __init__(self, trnf, net_f=None, head_slices=[], **kwargs):
+    def __init__(self, trnf, net_f, **kwargs):
         """
         Args:
             trnf (flow.flow.Transformer): 
                 transformer to use alongside this conditioner.
-            net (class): torch.nn.Module class that computes the parameters.
-                If None, defaults to `ConditionerNet`.
+            net_f (class): function or class with input 
+                (input_dim, output_dim, init=None) 
+                that will be used by ConditionerNet 
+                to create the Conditioner network.
         """
         super().__init__(trnf, **kwargs)
-        
-        if head_slices:
-            assert net_f is None
-            from functools import partial
-            net_f = partial(MultiHeadNet, head_slices=head_slices, use_dropout=False, use_bn=False)
 
         h_init = self.trnf._h_init()
 
@@ -159,11 +155,17 @@ class AutoregressiveNaive(Conditioner):
                 )
             )
         ])
+    
+    def _update_device(self, device):
+        super()._update_device(device)
+        
+        for net in self.nets:
+            net.device = device
 
     # Override methods
     def _h(self, x, cond=None, start=0):
         assert 0 <= start and start <= min(self.dim - 1, x.size(1))
-        x = self._prepend_cond(x, cond)
+        x = prepend_cond(x, cond)
 
         return torch.cat([
             net(x[:, :self.cond_dim + i])
@@ -195,7 +197,7 @@ class AutoregressiveNaive(Conditioner):
     def warm_start(self, x, cond=None, **kwargs):
         super().warm_start(x, cond=cond, **kwargs)
 
-        x = self._prepend_cond(x, cond)
+        x = prepend_cond(x, cond)
         for i, net in enumerate(self.nets):
             net.warm_start(x[:, :self.cond_dim + i])
 
@@ -245,7 +247,8 @@ class MADE_Net(nn.Sequential):
     def __init__(
         self, 
         input_dim, output_dim, 
-        hidden_sizes_mult=[10, 5], act=nn.ReLU,
+        hidden_sizes_mult=[10, 5], 
+        act=nn.ReLU, use_batch_norm=True, dropout=0,
         cond_dim=0, h_init=None,
     ):
         """
@@ -283,15 +286,14 @@ class MADE_Net(nn.Sequential):
         assert isinstance(cond_dim, int) and cond_dim >= 0
         self.cond_dim = cond_dim
 
-        self.add_module(nn.BatchNorm1d(cond_dim + input_dim))
-
         # Add all layers to the Sequential module
         # Define mask connectivity
         m = [ 
             torch.arange(-cond_dim, input_dim) + 1
         ] + [
             (
-                torch.randperm(input_dim + (cond_dim > 0)) + 
+                torch.arange(input_dim + (cond_dim > 0)) + 
+                # torch.randperm(input_dim + (cond_dim > 0)) + 
                 (cond_dim == 0)
             ).repeat(m) # 0 means cond input, > 0 are the actual inputs
             for m in hidden_sizes_mult
@@ -304,6 +306,13 @@ class MADE_Net(nn.Sequential):
         for k, (m0, m1) in enumerate(zip(m[:-1], m[1:])):
             # Define masks
             h0, h1 = m0.size(0), m1.size(0)
+            
+            if k == 0 or use_batch_norm:
+                self.add_module('batch_norm_%d' % k, nn.BatchNorm1d(h0))
+            
+            # Add a Dropout layer if dropout > .5
+            if k > 0 and dropout > 0:
+                self.add_module('dropout_%d' % k, nn.Dropout(dropout))
 
             # Check mask size
             if k == 0:
@@ -344,6 +353,30 @@ class MADE_Net(nn.Sequential):
         bn.running_var = x.var(0)
 
         return self
+    
+    
+class MADE_Resnet(MADE_Net):
+    """Feed-forward network with masked linear layers used for MADE."""
+            
+    def __init__(self, *args, res_every=2, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        assert len(set(self.hidden_sizes[::res_every])) == 1
+        self.res_every = res_every
+        
+    def forward(self, x):
+        k = 0
+        for n_layer, (name, layer) in enumerate(self.named_children()):
+            x = layer(x)
+            if name.startswith('masked_linear_'):
+                k += 1
+                if k == 1:
+                    prev = x
+                elif (k - 1) % self.res_every == 0 and n_layer < len(self) - 1:
+                    x = x + prev
+                    prev = x
+                    
+        return x
 
 
 class MADE(Conditioner):
@@ -376,35 +409,46 @@ class MADE(Conditioner):
 
     # Overrides:
     def _h(self, x, cond=None):
-        return self.net(self._prepend_cond(x, cond))
+        return self.net(prepend_cond(x, cond))
 
     def _invert(self, u, log_det=False, cond=None, **kwargs):
         # Invert dimension per dimension sequentially
-        # We don't use gradients now; we'll do a gradient run right after
-        with torch.no_grad():
-            x = self._prepend_cond(torch.randn_like(u), cond)
+        x = prepend_cond(torch.randn_like(u), cond)
+        log_det_sum = torch.zeros_like(u[:, 0])
 
-            for i in range(self.dim):
-                h_i = self.net(x) # obtain h_i from previously computed x
-                
-                x[:, [self.cond_dim + i]] = self.trnf(
-                    u[:, [i]], 
-                    h_i[:, self.trnf.h_dim * i : self.trnf.h_dim * (i + 1)], 
-                    invert=True, 
-                    log_det=False,
-                    **kwargs
-                )
+        for i in range(self.dim):
+            self.net.train(self.training and i == self.dim) # to avoid getting incorrect running means
+            h_i = self.net(x) # obtain h_i from previously computed x
 
-        # Run again, this time to get the gradient and log_det if required
-        h = self.net(x) # now we can compute for all dimensions
+            res = self.trnf(
+                u[:, [i]], 
+                h_i[:, self.trnf.h_dim * i : self.trnf.h_dim * (i + 1)], 
+                invert=True, 
+                log_det=log_det,
+                **kwargs
+            )
+
+            if log_det:
+                xi, log_det_i = res
+                log_det_sum = log_det_sum + log_det_i
+            else:
+                xi = res
+
+            x[:, [self.cond_dim + i]] = xi
         
-        return self.trnf(u, h, invert=True, log_det=log_det, **kwargs)
+        self.net.train(self.training) # reset self.net.training status
+        
+        # Remove the cond part of x
+        x = x[:, self.cond_dim:]        
+            
+        if log_det:
+            return x, log_det_sum
+        else:
+            return x
 
     def warm_start(self, x, cond=None, **kwargs):
         super().warm_start(x, cond=cond, **kwargs)
-        x = self._prepend_cond(torch.randn_like(u), cond)
-
-        self.net.warm_start(x, **kwargs)
+        self.net.warm_start(prepend_cond(x, cond), **kwargs)
 
         return self
 # ------------------------------------------------------------------------------
@@ -501,7 +545,7 @@ class CouplingLayers(Conditioner):
         assert trnf.dim == dim // 2
 
         trnf = _CouplingLayersTransformer(trnf, dim=dim)
-        super().__init__(trnf, dim=dim)
+        super().__init__(trnf, dim=dim, **kwargs)
 
         self.h_net = ConditionerNet(
             dim - dim // 2 + self.cond_dim, dim // 2 * trnf.h_dim, 
@@ -515,14 +559,14 @@ class CouplingLayers(Conditioner):
         id_dim = self.dim - self.dim // 2
         x1 = x[:, :id_dim]
         
-        return self.h_net(self._prepend_cond(x1, cond))
+        return self.h_net(prepend_cond(x1, cond))
 
     def _invert(self, u, cond=None, log_det=False, **kwargs): 
         id_dim = self.dim - self.dim // 2
         u1, u2 = u[:, :id_dim], u[:, id_dim:]
 
         x1 = u1        
-        h = self.h_net(self._prepend_cond(x1, cond))
+        h = self.h_net(prepend_cond(x1, cond))
         res2 = self.trnf(u2, h, invert=True, log_det=log_det, **kwargs)
 
         if log_det:
@@ -539,7 +583,7 @@ class CouplingLayers(Conditioner):
 
         id_dim = self.dim - self.dim // 2
         x1 = x[:, :id_dim]
-        x1 = self._prepend_cond(x1, cond)
+        x1 = prepend_cond(x1, cond)
         self.h_net.warm_start(x1, **kwargs)
 
         return self
