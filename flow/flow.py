@@ -226,13 +226,35 @@ class Sequential(Flow):
     def append(self, flow):
         assert flow.dim == self.dim
         self.flows.append(flow)
+        
+    def _n_kwargs(self, kwargs):
+        '''Separate layer-specific kwargs from the rest.
+        Note that this removes these kwargs from **kwargs.
+        '''
+        
+        n_kwargs = { 
+            n: {
+                k[len(nk):]: v 
+                for k, v in kwargs.items() 
+                if k.startswith(nk) 
+            }
+            for n, nk in map(lambda n: (n, f'__{n}_'), range(len(self)))
+        }
+        
+        for n, d in n_kwargs.items():
+            for k in d:
+                kwargs.pop(f'__{n}_{k}')
+                
+        return n_kwargs
 
     # Method overrides
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_det=False, **kwargs):     
+        n_kwargs = self._n_kwargs(kwargs)
+        
         log_det_sum = torch.zeros(1, device=x.device)
         
-        for flow in self.flows:
-            res = flow(x, log_det=log_det, **kwargs)
+        for n, flow in enumerate(self.flows):
+            res = flow(x, log_det=log_det, **n_kwargs[n], **kwargs)
 
             if log_det:
                 x, log_det_i = res
@@ -247,11 +269,13 @@ class Sequential(Flow):
         else:
             return x
 
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_det=False, **kwargs):    
+        n_kwargs = self._n_kwargs(kwargs)
+        
         log_det_sum = torch.zeros(1, device=u.device)
 
-        for flow in reversed(self.flows):
-            res = flow(u, invert=True, log_det=log_det, **kwargs)
+        for n, flow in zip(range(len(self) - 1, -1, -1), reversed(self.flows)):
+            res = flow(u, invert=True, log_det=log_det, **n_kwargs[n], **kwargs)
 
             if log_det:
                 u, log_det_i = res
@@ -274,12 +298,14 @@ class Sequential(Flow):
         Note that x will be progressively transformed before each 
         call to warm_start, from x to u.
         """
+        
+        n_kwargs = self._n_kwargs(kwargs)
 
-        for flow in self.flows:
-            flow.warm_start(x, **kwargs)
+        for n, flow in enumerate(self.flows):
+            flow.warm_start(x, **n_kwargs[n], **kwargs)
 
             with torch.no_grad():
-                x = flow(x, **kwargs)
+                x = flow(x, **n_kwargs[n], **kwargs)
 
         return self
 
@@ -411,6 +437,146 @@ class Conditioner(Flow):
     def _invert(self, u, log_det=False, cond=None, **kwargs):
         """Transform u into x."""
         raise NotImplementedError()
+        
+        
+class ConditionerNet(Module):
+    """Conditioner parameters network.
+
+    Used to compute the parameters h passed to a transformer.
+    If called with a void tensor (in an autoregressive setting, the first step),
+    returns a learnable tensor containing the required result.
+    """
+
+    def __init__(
+        self, 
+        input_dim, output_dim, h_init=None, net_f=None
+    ):
+        """
+        Args:
+            input_dim (int): input dimensionality.
+            output_dim (int): output dimensionality. 
+                Total dimension of all parameters combined.
+            h_init (torch.Tensor): tensor of shape (output_dim,) to use as initializer 
+                of the last layer bias. If None, original initialization used.
+            net_f (function): function net_f(input_dim, output_dim, init=None)
+                that creates a network with the given input and output dimensions,
+                and possibly receives an init Tensor that,
+                when not None, indicates that the function should be set 
+                so that it always return that tensor. 
+                This helps in initializing a tensor to the identity.
+        """
+        assert net_f is not None
+        
+        super().__init__()
+        
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        if h_init is not None:
+            assert h_init.shape == (output_dim,)
+            
+        if input_dim:
+            self.net = net_f(input_dim, output_dim, init=h_init)
+        else:
+            if h_init is None:
+                h_init = torch.randn(output_dim)
+
+            self.parameter = nn.Parameter(h_init.unsqueeze(0))
+
+    def forward(self, x):
+        """Feed-forward pass."""
+        if self.input_dim:
+            return self.net(x)
+        else:
+            return self.parameter.repeat(x.size(0), 1)
+
+    def warm_start(self, x, **kwargs):           
+        if self.input_dim:
+            bn = self.net[0]
+            assert bn.__class__.__name__.startswith('BatchNorm')
+
+            bn.running_mean.data = x.mean(0)
+            bn.running_var.data = x.var(0)
+
+        return self
+    
+    
+class Sequential1D(Sequential):
+    """Flow defined by a sequence of flows.
+
+    Note that flows are specified in the order X -> U.
+    That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).
+    """
+
+    def __init__(self, *flows, dim=1, cond_dim=0, net_f=None, **kwargs):
+        """
+        Args:
+            *flows (Flow): sequence of flows.
+            dim (int): dimensions of the flow.
+            cond_dim (int): dimensions of the conditioning input.
+            net_f (function): function(input_dim, output_dim, init=None).
+                Note that the actual network will be a `ConditionerNet`,
+                which admits cond_dim == 0, in which case a single parameter
+                will be trained instead of the network returned by net_f.
+        """
+        
+        assert dim == 1 # only works with 1D flows
+        assert net_f is not None
+
+        super().__init__(*flows, dim=dim, **kwargs)
+        
+        self.cond_dim = cond_dim
+        self.h_dim = [ getattr(flow, 'h_dim', 0) for flow in self ]
+        
+        init = [
+            m()
+            for m in (getattr(flow, '_h_init', None) for flow in self) 
+            if m is not None
+        ]
+        
+        if init: init = torch.cat(init, -1)
+        else: init = None
+        
+        self.net = ConditionerNet(self.cond_dim, sum(self.h_dim), h_init=init, net_f=net_f)
+
+    # Method overrides
+    def _create_n_kwargs(self, x, kwargs):
+        # Compute h once, and set it as layer-specific kwargs
+        cond = kwargs.pop('cond', None)
+        if cond is None:
+            cond = x[:, :0] # to get the appropriate size(0)
+            
+        h = self.net(cond)
+        
+        i = 0
+        for n, h_dim in enumerate(self.h_dim):
+            if h_dim: 
+                kwargs[f'__{n}_h'] = h[:, i:i + h_dim]
+                i += h_dim
+            
+    def forward(self, x, invert=False, log_det=False, **kwargs):
+        self._create_n_kwargs(x, kwargs)
+        
+        return super().forward(x, invert=invert, log_det=log_det, **kwargs)
+        
+    def warm_start(self, x, **kwargs):
+        self._create_n_kwargs(x, kwargs)
+        
+        return super().warm_start(x, **kwargs)
+
+    # Utilities
+    def __getitem__(self, k):
+        """Access subflows by indexing. 
+
+        Single ints return the corresponding subflow, 
+        while slices return a `Sequential` of the corresponding subflows.
+        """
+        
+        if isinstance(k, slice):
+            raise ValueError("Can't slice a Sequential1D") 
+            # since we would need to slice the network
+        else:
+            return super().__getitem__(k)
 
 
 def dec_trnf_1d(func):

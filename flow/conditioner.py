@@ -16,7 +16,7 @@ from torch import nn
 
 import torch.nn.functional as F
 
-from .flow import Conditioner
+from .flow import Conditioner, ConditionerNet
 from .utils import Module, MultiHeadNet, prepend_cond
 
 
@@ -62,66 +62,6 @@ def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=Non
         last_bias.data = init.to(last_bias.device)
         
     return net
-
-
-class ConditionerNet(Module):
-    """Conditioner parameters network.
-
-    Used to compute the parameters h passed to a transformer.
-    If called with a void tensor (in an autoregressive setting, the first step),
-    returns a learnable tensor containing the required result.
-    """
-
-    def __init__(
-        self, 
-        input_dim, output_dim, net_f, h_init=None,
-    ):
-        """
-        Args:
-            input_dim (int): input dimensionality.
-            output_dim (int): output dimensionality. 
-                Total dimension of all parameters combined.
-            net_f (function): function net_f(input_dim, output_dim, init=None)
-                that creates a network with the given input and output dimensions,
-                and possibly receives an init Tensor that,
-                when not None, indicates that the function should be set 
-                so that it always return that tensor. 
-                This helps in initializing a tensor to the identity.
-            h_init (torch.Tensor): tensor to use as initializer 
-                of the last layer bias. If None, original initialization used.
-        """
-        super().__init__()
-
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-
-        if h_init is not None:
-            assert h_init.shape == (output_dim,)
-            
-        if input_dim:
-            self.net = net_f(input_dim, output_dim, init=h_init)
-        else:
-            if h_init is None:
-                h_init = torch.randn(output_dim)
-
-            self.parameter = nn.Parameter(h_init.unsqueeze(0))
-
-    def forward(self, x):
-        """Feed-forward pass."""
-        if self.input_dim:
-            return self.net(x)
-        else:
-            return self.parameter.repeat(x.size(0), 1) # n == batch size
-
-    def warm_start(self, x, **kwargs):           
-        if self.input_dim:
-            bn = self.net[0]
-            assert bn.__class__.__name__.startswith('BatchNorm')
-
-            bn.running_mean.data = x.mean(0)
-            bn.running_var.data = x.var(0)
-
-        return self
 
 
 class AutoregressiveNaive(Conditioner):
