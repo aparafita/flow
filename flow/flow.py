@@ -16,9 +16,17 @@ Also function:
 import torch
 from torch import nn
 
-from .prior import Normal as NormalPrior
 from .utils import Module
 
+
+class UndefinedPriorException(Exception):
+    
+    def __init__(self, flow):
+        self.flow = flow
+        
+    def __str__(self):
+        return f'Undefined prior for {self.flow}'
+    
 
 class Flow(Module):
     r"""Base abstract class for any Flow. 
@@ -28,20 +36,27 @@ class Flow(Module):
     a standard Normal distribution by default.
 
     Any class that inherits from Flow needs to implement:
-    ```python
+    ```python        
     def _transform(self, x, log_det=False, **kwargs): 
-        # Transforms x into u. Used for training.
+        # Transform x into u. Used for training.
         ...
 
     def _invert(self, u, log_det=False, **kwargs): 
-        # Transforms u into x. Used for sampling.
+        # Transform u into x. Used for sampling.
         ...
 
     def warm_start(self, x, **kwargs):
         # Warm start operation for the flow, if necessary.
         ...
     ```
-
+    
+    It also must define an `h_dim` attribute,
+    containing the total dimensionality of the flow's parameters.
+    It can be 0 or a positive integer (0 by default, if it is not defined). 
+    Alternatively, you can set the `h_dim_1d` attribute 
+    to refer to the number of parameters per-dimension. 
+    This sets h_dim automatically as self.h_dim = self.h_dim_1d * self.dim.
+    
     Both _transform and _invert may also return log|det J_T| if log_det is True.
     Otherwise, they only return the transformed tensor.
 
@@ -52,26 +67,34 @@ class Flow(Module):
     Remember that it's convenient for training stability to initialize
     the flow so that it performs the identity transformation (or close to it).
     """
+    
+    @property
+    def h_dim_1d(self):
+        return self.h_dim // self.dim
+    
+    @h_dim_1d.setter
+    def h_dim_1d(self, value):
+        self.h_dim = value * self.dim
 
-    def __init__(self, dim=1, prior=None, **kwargs):
+    def __init__(self, dim=1, prior=None):
         """
         Args:
-            dim (int): dimensionality of this flow. Defaults to 1.
+            dim (int): dimensionality of this flow. Defaults to 1.    
             prior (class): prior class for U (inheriting `flow.prior.Prior`).
-                Used for sampling and in the computation of nll.
-                If None, defaults to `flow.prior.Normal`.
-                If this flow is in a `Sequential`, its prior is ignored.
+                Used for sampling and in the computation of loglk.
+                If None, no prior will be defined.
+                Be mindful that your top-most flow should have a prior;
+                otherwise, `sample`, `loglk` and `reverse_kl` will raise an AssertionError.
         """
         super().__init__()
 
         self.dim = dim
-
-        if prior is None:
-            prior = NormalPrior(dim=dim)
-        else:
-            assert prior.dim == dim
+        self.h_dim = 0 # by default, unless re-specified by the subclass
         
-        self.prior = prior
+        if prior is not None:
+            self.prior = prior(dim=dim)
+        else:
+            self.prior = None
 
 
     def forward(self, t, invert=False, log_det=False, **kwargs):
@@ -98,7 +121,7 @@ class Flow(Module):
             return self._invert(t, **kwargs, log_det=log_det)
 
 
-    # Override these methods
+    # Override these methods        
     def _transform(self, x, log_det=False, **kwargs):
         """Transform x into u."""
         raise NotImplementedError()
@@ -122,27 +145,36 @@ class Flow(Module):
     # Utilities
     def sample(self, n, **kwargs):
         """Generate n samples from X."""
-        assert self.prior is not None
+        if self.prior is None: 
+            raise UndefinedPriorException(self)
         
         u = self.prior.sample(n)
         x = self(u, **kwargs, invert=True)
 
         return x
 
-    def nll(self, x, **kwargs):
-        """Compute the negative log-likelihood of samples x.
-
-        The result of this function can directly be used 
-        as the MLE training loss for a flow.
+    def loglk(self, x, **kwargs):
+        """Compute the log-likelihood of samples x.
         """
-        assert self.prior is not None
+        if self.prior is None: 
+            raise UndefinedPriorException(self)
 
         u, log_det = self(x, **kwargs, log_det=True)
         assert len(log_det.shape) == 1
 
-        return self.prior.nll(u) - log_det
+        return self.prior.loglk(u) + log_det
+    
+    def nll(self, *args, **kwargs):
+        """Compute the *negative* log-likelihood of samples x.
+        
+        The result of this function can directly be used 
+        as the MLE training loss for a flow.
+        
+        Refer to `loglk` for details about the function.
+        """
+        return -self.loglk(*args, **kwargs)
 
-    def reverse_kl(self, n, nll_x, **kwargs):
+    def reverse_kl(self, n, loglk_f, **kwargs):
         """Compute the reverse KL divergence of n prior samples.
 
         Used to train flows in reverse mode.
@@ -150,18 +182,19 @@ class Flow(Module):
 
         Args:
             n (int): number of samples.
-            nll_x (function): negative log-density function of x.
-                Also receives **kwargs.
+            loglk_f (function): log-density function(x, **kwargs) for x.
         """
-        assert self.prior is not None
+        if self.prior is None: 
+            raise UndefinedPriorException(self)
 
         u = self.prior.sample(n)
-        loglk_u = -self.prior.nll(u)
+        loglk_u = self.prior.loglk(u)
 
         x, log_det = self(u, log_det=True, invert=True, **kwargs)
-        assert len(log_det.shape) == 1
+        assert log_det.shape == (n,)
 
-        loglk_x = -nll_x(x, **kwargs)
+        loglk_x = loglk_f(x, **kwargs)
+        assert loglk_x.shape == (n,)
 
         return loglk_u - log_det - loglk_x
 
@@ -214,7 +247,9 @@ class Sequential(Flow):
         assert dim == kwargs.pop('dim', dim), 'dim and flows dim do not match'
 
         super().__init__(dim=dim, **kwargs)
+        
         self.flows = nn.ModuleList(flows) # save flows in ModuleList
+        self.h_dim = sum(f.h_dim for f in self.flows)
 
     # Device overrides
     def _update_device(self, device):
@@ -222,10 +257,12 @@ class Sequential(Flow):
         
         for flow in self.flows:
             flow.device = device
-
+            
+    # Sequential methods
     def append(self, flow):
         assert flow.dim == self.dim
         self.flows.append(flow)
+        self.h_dim += flow.h_dim # update it
         
     def _n_kwargs(self, kwargs):
         '''Separate layer-specific kwargs from the rest.
@@ -289,8 +326,7 @@ class Sequential(Flow):
             return u, log_det_sum
         else:
             return u
-
-
+    
     # Utilities
     def warm_start(self, x, **kwargs):
         """Call warm_start(x, **kwargs) to each subflow.
@@ -358,7 +394,7 @@ class Conditioner(Flow):
     ```
 
     Note that a `Conditioner` does not require an implementation 
-    for method _transform, since it is dealt with by the transformer.
+    for its method _transform, since it is dealt with by the transformer.
     However, it does need one for _invert, 
     since it depends on the implemented conditioner.
 
@@ -391,6 +427,8 @@ class Conditioner(Flow):
         super().__init__(dim=dim, prior=prior, **kwargs)
 
         self.trnf = trnf
+        self.h_dim = self.trnf.h_dim
+        
         assert cond_dim >= 0
         self.cond_dim = cond_dim
 
@@ -443,7 +481,7 @@ class ConditionerNet(Module):
     """Conditioner parameters network.
 
     Used to compute the parameters h passed to a transformer.
-    If called with a void tensor (in an autoregressive setting, the first step),
+    If its input_dim is 0 (i.e., a Flow of dimension 1 without conditioning),
     returns a learnable tensor containing the required result.
     """
 
@@ -456,8 +494,8 @@ class ConditionerNet(Module):
             input_dim (int): input dimensionality.
             output_dim (int): output dimensionality. 
                 Total dimension of all parameters combined.
-            h_init (torch.Tensor): tensor of shape (output_dim,) to use as initializer 
-                of the last layer bias. If None, original initialization used.
+            h_init (torch.Tensor): tensor of shape (output_dim,) to use as initializer.
+                If None, original initialization used.
             net_f (function): function net_f(input_dim, output_dim, init=None)
                 that creates a network with the given input and output dimensions,
                 and possibly receives an init Tensor that,
@@ -502,31 +540,33 @@ class ConditionerNet(Module):
     
     
 class Sequential1D(Sequential):
-    """Flow defined by a sequence of flows.
-
-    Note that flows are specified in the order X -> U.
-    That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).
+    """Flow defined by a sequence of 1D-flows.
+    
+    This makes it possible to define a single conditioner for all subflows,
+    helping in mitigating overfitting.
     """
 
-    def __init__(self, *flows, dim=1, cond_dim=0, net_f=None, **kwargs):
+    def __init__(self, *flows, cond_dim=0, net_f=None, **kwargs):
         """
         Args:
             *flows (Flow): sequence of flows.
             dim (int): dimensions of the flow.
             cond_dim (int): dimensions of the conditioning input.
             net_f (function): function(input_dim, output_dim, init=None).
+                input_dim will actually be the passed cond_dim.
                 Note that the actual network will be a `ConditionerNet`,
                 which admits cond_dim == 0, in which case a single parameter
                 will be trained instead of the network returned by net_f.
         """
         
-        assert dim == 1 # only works with 1D flows
+        assert kwargs.pop('dim', 1) == 1 # only works with 1D flows
         assert net_f is not None
 
-        super().__init__(*flows, dim=dim, **kwargs)
+        super().__init__(*flows, dim=1, **kwargs)
         
         self.cond_dim = cond_dim
-        self.h_dim = [ getattr(flow, 'h_dim', 0) for flow in self ]
+        self.h_dims = [ getattr(flow, 'h_dim', 0) for flow in self ]
+        self.h_dim = sum(self.h_dims)
         
         init = [
             m()
@@ -537,7 +577,7 @@ class Sequential1D(Sequential):
         if init: init = torch.cat(init, -1)
         else: init = None
         
-        self.net = ConditionerNet(self.cond_dim, sum(self.h_dim), h_init=init, net_f=net_f)
+        self.net = ConditionerNet(self.cond_dim, self.h_dim, h_init=init, net_f=net_f)
 
     # Method overrides
     def _create_n_kwargs(self, x, kwargs):
@@ -549,7 +589,7 @@ class Sequential1D(Sequential):
         h = self.net(cond)
         
         i = 0
-        for n, h_dim in enumerate(self.h_dim):
+        for n, h_dim in enumerate(self.h_dims):
             if h_dim: 
                 kwargs[f'__{n}_h'] = h[:, i:i + h_dim]
                 i += h_dim
@@ -580,6 +620,10 @@ class Sequential1D(Sequential):
 
 
 def dec_trnf_1d(func):
+    """Decorator used to define a _transform/_invert method as a 1D operation.
+    If multiple dimensions are passed, the method will be called individually
+    per dimension and the results will be aggregated by this decorator."""
+    
     from functools import wraps
     
     @wraps(func)
@@ -631,7 +675,8 @@ class Transformer(Flow):
         # 
         # For example, for a scale parameter, _activation could pass h
         # through a softplus function to make it positive.
-        # Returns a tuple with the activated tensor parameters.
+        #
+        # Must return a tuple with the activated tensor parameters (even if it's just one).
         ...
 
     def _transform(self, x, *h, log_det=False, **kwargs): 
@@ -646,27 +691,18 @@ class Transformer(Flow):
         # Return initialization values for pre-activation h parameters.
         ...
     ```
+    Also, any subclass must define their `h_dim` attribute.
+    As an example, an Affine transformer has h_dim=2 * self.dim 
+    (loc and scale, one for each dimension).
 
     Note that forward, _transform and _invert all receive h,
     that contains the parameters for the transformation.
-
-    The required attribute h_dim represents the dimensionality 
-    of the required parameters for each dimension in the flow.
-    As an example, an Affine transformer has h_dim=2 (loc and scale)
-    for each dimension in the flow.
 
     CAUTION: all the three first methods need to be general enough 
         to work with dim=1 or an arbitrary dim,
         since the conditioner might pass any number of dimensions
         to transform depending on how it works.
     """
-
-    def __init__(self, **kwargs):
-        """""" # to avoid inheriting its parent in the documentation.
-        super().__init__(**kwargs)
-
-        self.h_dim = kwargs.get('h_dim', -1)
-        assert self.h_dim >= 0
 
     def forward(self, t, h, invert=False, log_det=False, **kwargs):
         r"""Call _activation(h) and pass it to _transform or _invert.
@@ -725,6 +761,6 @@ class Transformer(Flow):
         
         Returns:
             result: None if no initialization is required or
-                tensor with shape (dim * h_dim,) with the initialization values.
+                tensor with shape (h_dim,) with the initialization values.
         """
         return None # by default, no initialization suggested

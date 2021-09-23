@@ -30,12 +30,9 @@ class Affine(Transformer):
             eps (float): lower-bound for scale parameter.
         """
 
-        _h_dim = 2
-        h_dim = kwargs.pop('h_dim', _h_dim)
-        assert h_dim == _h_dim, f'Received h_dim={h_dim} but expected {_h_dim}'
-
-        super().__init__(h_dim=h_dim, **kwargs)
-
+        super().__init__(**kwargs)
+        
+        self.h_dim_1d = 2
         self.eps = eps
 
     def _log_det(self, scale):
@@ -43,15 +40,12 @@ class Affine(Transformer):
 
     def _activation(self, h):
         """Returns (loc, scale) parameters."""
-        assert not h.size(1) % self.h_dim
-
         loc, scale = h[:, ::2], h[:, 1::2]
         scale = F.softplus(scale) + self.eps
 
         return loc, scale
 
-    def _transform(self, x, *h, log_det=False, **kwargs):
-        loc, scale = h
+    def _transform(self, x, loc, scale, log_det=False, **kwargs):
         u = x * scale + loc
 
         if log_det:
@@ -59,8 +53,7 @@ class Affine(Transformer):
         else:
             return u
 
-    def _invert(self, u, *h, log_det=False, **kwargs):
-        loc, scale = h
+    def _invert(self, u, loc, scale, log_det=False, **kwargs):
         x = (u - loc) / scale
 
         if log_det:
@@ -69,7 +62,7 @@ class Affine(Transformer):
             return x
 
     def _h_init(self):
-        h_init = torch.zeros(self.dim * self.h_dim, device=self.device)
+        h_init = torch.zeros(self.h_dim, device=self.device)
         h_init[1::2] = softplus_inv(torch.tensor(1. - self.eps)).item()
 
         return h_init
@@ -142,7 +135,7 @@ class _AdamInvTransformer(Transformer):
                 If None, u = torch.randn_like(x).
         """
 
-        super().__init__(reversed=reversed, **kwargs)
+        super().__init__(**kwargs)
 
         self.inv_lr = inv_lr
         self.inv_eps = inv_eps
@@ -213,22 +206,18 @@ class NonAffine(_AdamInvTransformer):
                 Defaults to `flow.modules.LeakyReLU`.
             eps (float): lower-bound to strictly-positive h parameters.
         """
-
-        _h_dim = 3 * k + 1
-        h_dim = kwargs.pop('h_dim', _h_dim)
-        assert h_dim == _h_dim, f'Received h_dim={h_dim} but expected {_h_dim}'
-
-        super().__init__(h_dim=h_dim, **kwargs)
-
+        super().__init__(**kwargs)
+        
+        self.h_dim_1d = 3 * k + 1
         self.k = k
         self.nl = nl()
         self.eps = eps
 
     def _activation(self, h):
         """Returns (weight, loc, scale, bias) parameters."""
-        assert not h.size(1) % self.h_dim
-
-        h = h.view(h.size(0), -1, self.h_dim)
+        assert h.shape[1] == self.h_dim
+        
+        h = h.view(h.size(0), -1, self.h_dim_1d)
         loc, scale, log_weight = h[..., :-1:3], h[..., 1:-1:3], h[..., 2:-1:3]
         bias = h[..., -1]
 
@@ -266,7 +255,7 @@ class NonAffine(_AdamInvTransformer):
             return x
 
     def _h_init(self):
-        h_init = torch.zeros(self.dim, self.h_dim, device=self.device)
+        h_init = torch.zeros(self.dim, self.h_dim_1d, device=self.device)
         # loc and bias 0, scale 1
         # weight can be random, since all components return the same result
 
@@ -275,7 +264,7 @@ class NonAffine(_AdamInvTransformer):
             torch.tensor(1. - self.eps)
         ).item() # scale
         h_init[:, 2:-1:3] = torch.randn(
-            self.dim, self.h_dim // 3, device=self.device
+            self.dim, self.h_dim_1d // 3, device=self.device
         ) # log_weight
         
         h_init[:, -1] = 0 # bias
@@ -297,21 +286,17 @@ class DSF(_AdamInvTransformer):
             - alpha (float): alpha parameter for the sigmoid. Defaults to 1.
         """
 
-        _h_dim = 3 * k
-        h_dim = kwargs.pop('h_dim', _h_dim)
-        assert h_dim == _h_dim, f'Received h_dim={h_dim} but expected {_h_dim}'
-
-        super().__init__(h_dim=h_dim, **kwargs)
+        super().__init__(**kwargs)
+        
+        self.h_dim_1d = 3 * k
 
         self.k = k
         self.eps = eps
-        self.ls = LogSigmoid(dim=self.dim, alpha=alpha, eps=eps)
+        self.ls = LogSigmoid(dim=self.dim, alpha=alpha)
 
     def _activation(self, h):
         """Returns (loc, scale, w, loc_post, scale_post) parameters."""
-        assert not h.size(1) % self.h_dim, (h.size(1), self.h_dim)
-
-        h = h.view(h.size(0), -1, self.h_dim)
+        h = h.view(h.size(0), -1, self.h_dim_1d)
 
         loc, scale, log_w = h[..., ::3], h[..., 1::3], h[..., 2::3]
         
@@ -365,7 +350,7 @@ class DSF(_AdamInvTransformer):
             return u
 
     def _h_init(self):
-        h_init = torch.zeros(self.dim, self.h_dim, device=self.device)
+        h_init = torch.zeros(self.dim, self.h_dim_1d, device=self.device)
         # loc 0, scale 1
         # weight can be random, since all components return the same result
 
@@ -374,181 +359,11 @@ class DSF(_AdamInvTransformer):
             torch.tensor(1. - self.eps)
         ).item() # scale
         h_init[:, 2::3] = torch.randn(
-            self.dim, self.h_dim // 3, device=self.device
+            self.dim, self.h_dim_1d // 3, device=self.device
         ) # log_weight
 
         return h_init.flatten()
 
-
-'''
-class RQ_Spline(Transformer):
-    """Neural Spline Flow, implemented for the rational quadratic case.
-    
-    Based on https://arxiv.org/pdf/1906.04032.pdf
-    """
-    
-    @property
-    def K(self):
-        return self._K.item()
-    
-    @property
-    def width(self):
-        return self.B - self.A
-    
-    def __init__(self, K=20, eps=1e-3, A=0., B=1., **kwargs):
-        assert isinstance(K, int) and K >= 2
-        assert A < B
-
-        dim = kwargs.pop('dim', 1)
-        prior = kwargs.pop('prior', Uniform(dim=dim))
-        
-        # How many parameters? K for widths and heights, K - 1 for derivatives
-        h_dim = 3 * K - 1
-        super().__init__(h_dim=h_dim, prior=prior, dim=dim, **kwargs)
-        
-        self.register_buffer('_K', torch.tensor(int(K)))
-        self.register_buffer('A', torch.tensor(float(A)))
-        self.register_buffer('B', torch.tensor(float(B)))
-        self.register_buffer('eps', torch.tensor(eps))
-        
-    def _activation(self, h, **kwargs): 
-        h = h.view(h.size(0), -1, self.h_dim)
-        
-        widths, heights, derivatives = h[..., 0::3], h[..., 1::3], h[..., 2::3]
-        
-        widths = (self.eps + (1 - self.eps * self.K) * torch.softmax(widths, -1)) * self.width
-        heights = (self.eps + (1 - self.eps * self.K) * torch.softmax(heights, -1)) * self.width
-        derivatives = torch.nn.functional.softplus(derivatives) + self.eps
-        
-        xknots = torch.cat(
-            [torch.zeros_like(widths[..., :1]), torch.cumsum(widths, -1)], -1
-        ) + self.A
-        yknots = torch.cat(
-            [torch.zeros_like(heights[..., :1]), torch.cumsum(heights, -1)], -1
-        ) + self.A
-        
-        derivatives = torch.cat([
-            torch.ones_like(derivatives[..., :1]),
-            derivatives,
-            torch.ones_like(derivatives[..., :1])
-        ], -1)
-        
-        s = (yknots[..., 1:] - yknots[..., :-1]) / (xknots[..., 1:] - xknots[..., :-1])
-        
-        return widths, heights, derivatives, xknots, yknots, s
-
-    def _h_init(self):
-        h = torch.randn(self.dim, self.h_dim, device=self.device) * 1e-1
-        
-        # heights = h[0::3], which should be all 1s -> 0 pre
-        # widths = h[1::3], which should be all 1 / K -> 0 pre
-        # derivatives = h[2::3], which should be 1 -> softplus^-1(1 - self.eps)
-        
-        h[..., 2::3] += softplus_inv(1. - self.eps)
-        
-        return h.flatten()
-    
-    def _transform(self, x, widths, heights, derivatives, xknots, yknots, s, log_det=False, **kwargs):
-        # In/out of window (A, B)
-        idx = (self.A <= x) & (x < self.B)
-        u = torch.zeros_like(x)
-        u[~idx] = x[~idx]
-
-        # Transform x into u using parameters h
-        bins = ((xknots[..., :-1] <= x.unsqueeze(-1)) & (x.unsqueeze(-1) < xknots[..., 1:])).float()
-
-        xk, xk1 = (xknots[..., :-1] * bins).sum(-1), (xknots[..., 1:] * bins).sum(-1)
-        yk, yk1 = (yknots[..., :-1] * bins).sum(-1), (yknots[..., 1:] * bins).sum(-1)
-        dk, dk1 = (derivatives[..., :-1] * bins).sum(-1), (derivatives[..., 1:] * bins).sum(-1)
-        sk = (s * bins).sum(-1)
-
-        # Note that we can get to nans if x was outside bounds.
-        # Filter all these terms to idx:
-        x = x[idx]
-        xk = xk[idx]
-        xk1 = xk1[idx]
-        yk = yk[idx]
-        yk1 = yk1[idx]
-        dk = dk[idx]
-        dk1 = dk1[idx]
-        sk = sk[idx]
-        
-        e = ((x - xk) / (xk1 - xk))
-
-        u[idx] = (yk + (
-            (yk1 - yk) * (sk * e ** 2 + dk * e * (1 - e))
-        ) / (
-            sk + (dk1 + dk - 2 * sk) * e * (1 - e)
-        ))
-        
-        if log_det:
-            log_det = torch.zeros_like(u)
-            log_det[idx] = (
-                (
-                    2 * torch.log(sk) + torch.log(
-                        dk1 * e ** 2 + 2 * sk * e * (1 - e) + dk * (1 - e) ** 2
-                    )
-                ) - (
-                    2 * torch.log(sk + (dk1 + dk - 2 * sk) * e * (1 - e))
-                )
-            )
-            log_det = log_det.sum(1)
-            assert log_det.shape == (u.size(0),)
-            
-            return u, log_det
-        else:
-            return u
-
-    def _invert(self, u, widths, heights, derivatives, xknots, yknots, s, log_det=False, **kwargs):
-        # In/out of window (-B, B)
-        idx = (self.A <= u) & (u < self.B)
-        x = torch.zeros_like(u)
-        x[~idx] = u[~idx]
-
-        # Transform x into u using parameters h
-        bins = ((yknots[..., :-1] <= u.unsqueeze(-1)) & (u.unsqueeze(-1) < yknots[..., 1:])).float()
-
-        xk, xk1 = (xknots[..., :-1] * bins).sum(-1), (xknots[..., 1:] * bins).sum(-1)
-        yk, yk1 = (yknots[..., :-1] * bins).sum(-1), (yknots[..., 1:] * bins).sum(-1)
-        dk, dk1 = (derivatives[..., :-1] * bins).sum(-1), (derivatives[..., 1:] * bins).sum(-1)
-        sk = (s * bins).sum(-1)
-        
-        # Note that we can get to nans if x was outside bounds.
-        # Filter all these terms to idx:
-        u = u[idx]
-        xk = xk[idx]
-        xk1 = xk1[idx]
-        yk = yk[idx]
-        yk1 = yk1[idx]
-        dk = dk[idx]
-        dk1 = dk1[idx]
-        sk = sk[idx]
-
-        a = (yk1 - yk) * (sk - dk) + (u - yk) * (dk1 + dk - 2 * sk)
-        b = (yk1 - yk) * dk - (u - yk) * (dk1 + dk - 2 * sk)
-        c = -sk * (u - yk)
-
-        e = 2 * c / (-b - torch.sqrt(b ** 2 - 4 * a * c))
-        x[idx] = (e * (xk1 - xk) + xk)
-        
-        if log_det:
-            log_det = torch.zeros_like(x)
-            log_det[idx] = (
-                (
-                    2 * torch.log(sk) + torch.log(
-                        dk1 * e ** 2 + 2 * sk * e * (1 - e) + dk * (1 - e) ** 2
-                    )
-                ) - (
-                    2 * torch.log(sk + (dk1 + dk - 2 * sk) * e * (1 - e))
-                )
-            )
-            log_det = log_det.sum(1)
-            assert log_det.shape == (x.size(0),)
-            
-            return x, -log_det
-        else:
-            return x
-'''
 
 class RQ_Spline(Transformer):
     """Neural Spline Flow, implemented for the rational quadratic case.
@@ -575,12 +390,10 @@ class RQ_Spline(Transformer):
         if fA is None: fA = A
         if fB is None: fB = B
 
-        dim = kwargs.pop('dim', 1)
-        prior = kwargs.pop('prior', Uniform(dim=dim))
+        super().__init__(**kwargs)
         
         # How many parameters? K for widths and heights, K - 1 for derivatives
-        h_dim = 3 * K + 1
-        super().__init__(h_dim=h_dim, prior=prior, dim=dim, **kwargs)
+        self.h_dim_1d = 3 * K + 1
         
         self.register_buffer('_K', torch.tensor(int(K)))
         self.register_buffer('A', torch.tensor(float(A)))
@@ -590,7 +403,7 @@ class RQ_Spline(Transformer):
         self.register_buffer('eps', torch.tensor(eps))
         
     def _activation(self, h, **kwargs): 
-        h = h.view(h.size(0), -1, self.h_dim)
+        h = h.view(h.size(0), -1, self.h_dim_1d)
         
         derivatives, widths, heights = h[..., 0::3], h[..., 1::3], h[..., 2::3]
         
@@ -611,7 +424,7 @@ class RQ_Spline(Transformer):
         return widths, heights, derivatives, xknots, yknots, s
 
     def _h_init(self):
-        h = torch.randn(self.dim, self.h_dim, device=self.device) * 1e-1
+        h = torch.randn(self.dim, self.h_dim_1d, device=self.device) * 1e-1
         
         # heights = h[0::3], which should be all 1s -> 0 pre
         # widths = h[1::3], which should be all 1 / K -> 0 pre
@@ -713,8 +526,8 @@ class RQ_Spline(Transformer):
         if log_det:
             log_det = torch.zeros_like(x)
             
-            log_det[u < self.fA] = -torch.log(derivatives[..., 0][u < self.fA])
-            log_det[u > self.fB] = -torch.log(derivatives[..., -1][u > self.fB])
+            log_det[x < self.fA] = -torch.log(derivatives[..., 0][x < self.fA])
+            log_det[x > self.fB] = -torch.log(derivatives[..., -1][x > self.fB])
             
             log_det[idx] = (
                 (
@@ -749,19 +562,18 @@ class Q_Spline(Transformer):
     
     def __init__(self, K=20, eps=1e-6, **kwargs):
         assert isinstance(K, int) and K >= 2
-
-        prior = kwargs.pop('prior', Uniform(dim=kwargs.get('dim', 1)))
+        
+        super().__init__(**kwargs)
         
         # How many parameters? K for the widths (not considering 0 and 1)
         # and K + 1 for each cut output value.
-        h_dim = 2 * K + 1
-        super().__init__(h_dim=h_dim, prior=prior, **kwargs)
+        self.h_dim_1d = 2 * K + 1
         
         self.register_buffer('_K', torch.tensor(int(K)))
         self.register_buffer('eps', torch.tensor(eps))
         
     def _activation(self, h, **kwargs): 
-        h = h.view(h.size(0), self.dim, self.h_dim)
+        h = h.view(h.size(0), -1, self.h_dim_1d)
         
         heights, widths = h[..., 0::2], h[..., 1::2]
         widths = torch.softmax(widths, -1)
@@ -776,10 +588,10 @@ class Q_Spline(Transformer):
         return widths.flatten(1), heights.flatten(1)
 
     def _h_init(self):
-        h = torch.randn(self.dim, self.h_dim, device=self.device) * 1e-1
+        h = torch.randn(self.dim, self.h_dim_1d, device=self.device) * 1e-1
         
-        # heights = h[0::2], which should be all 1s -> 0 pre
-        # widths = h[1::2], which should be all 1 / K -> 0 pre
+        # heights = h[:, 0::2], which should be all 1s -> 0 pre
+        # widths = h[:, 1::2], which should be all 1 / K -> 0 pre
         
         return h.flatten()
     
@@ -795,7 +607,7 @@ class Q_Spline(Transformer):
 
     def _preprocess_h(self, widths, heights):
         widths, heights = tuple(
-            h.view(h.size(0), self.dim, -1) 
+            h.view(h.size(0), -1, self.h_dim_1d) 
             for h in [widths, heights]
         )
 

@@ -24,6 +24,7 @@ def prepend_cond(x, cond=None):
         return x
     else:
         if cond.size(0) < x.size(0):
+            assert not x.size(0) % cond.size(0)
             cond = cond.repeat(x.size(0) // cond.size(0), 1)
 
         assert cond.size(0) == x.size(0)
@@ -116,6 +117,7 @@ def monotonic_increasing_bijective_search(
     return u
 
 
+""" # Old code to be removed in a future commit, kept here as reference
 class MultiHeadNet(Module):
     
     def __init__(self, input_dim, output_dim, head_slices=[], use_dropout=True, use_bn=True, init=None):            
@@ -255,3 +257,4 @@ class MultiHeadNet(Module):
         bn.running_var.data = x.var(0)
 
         return self
+"""

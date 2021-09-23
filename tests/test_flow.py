@@ -11,6 +11,7 @@ import torch
 from torch import nn
 
 from flow.flow import Flow, inv_flow, Sequential
+from flow import prior
 from flow.modules import Affine as AffineFlow
 
 from utils import torch_eq_float, skip_cuda
@@ -24,7 +25,7 @@ def test_flow_affine():
     If flow.Flow has changed, AffineFlow should stop working.
     """ 
     weight = torch.ones(1, 1) * 2
-    flow = AffineFlow(weight=weight)
+    flow = AffineFlow(weight=weight, prior=prior.Normal)
     x = torch.ones(1, 1)
 
     u, log_det = flow(x, log_det=True)
@@ -49,8 +50,8 @@ def test_flow_affine():
 def test_inv_flow():
     """Test if inv_flow inverts a Flow class."""
     weight = torch.ones(1, 1) * 2
-    flow = AffineFlow(weight=weight)
-    flow_inv = inv_flow(AffineFlow)(weight=weight)
+    flow = AffineFlow(weight=weight, prior=prior.Normal)
+    flow_inv = inv_flow(AffineFlow)(weight=weight, prior=prior.Normal)
 
     x = flow.sample(100)
     u = flow(x)
@@ -74,7 +75,7 @@ def test_sequential():
     for i, flow in enumerate(flows):
         flow.index = i
 
-    flow = Sequential(*flows) # transform: x * 2^5
+    flow = Sequential(*flows, prior=prior.Normal) # transform: x * 2^5
 
     # Test __getitem__
     for i in range(5):
@@ -114,7 +115,7 @@ def test_sequential():
 def test_sequential_device():
     """Test that device is updated across a whole flow."""
     
-    flow = Sequential(*(AffineFlow() for _ in range(5)))
+    flow = Sequential(*(AffineFlow() for _ in range(5)), prior=prior.Normal)
 
     for method in [flow.cuda, flow.cpu]:
         method() # flow.cuda() or flow.cpu()

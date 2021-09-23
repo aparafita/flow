@@ -442,7 +442,7 @@ class BatchNorm(Flow):
         self.register_buffer('eps', torch.tensor(eps))
         self.register_buffer('momentum', torch.tensor(momentum))
 
-        self.register_buffer('updates', torch.tensor(0))
+        self.register_buffer('initialized', torch.tensor(False))
 
         self.register_buffer('batch_loc', torch.zeros(1, self.dim))
         self.register_buffer('batch_scale', torch.ones(1, self.dim))
@@ -462,7 +462,7 @@ class BatchNorm(Flow):
             self.batch_loc.data = x.mean(0, keepdim=True)
             self.batch_scale.data = x.std(0, keepdim=True) + self.eps
 
-            self.updates.data = torch.tensor(1).to(self.device)
+            self.initialized.data = torch.tensor(True).to(self.device)
 
         return self
 
@@ -476,16 +476,17 @@ class BatchNorm(Flow):
 
             # Update self.batch_loc, self.batch_scale
             with torch.no_grad():
-                if self.updates.item() == 0:
+                if not self.initialized.item():
                     self.batch_loc.data = bloc
                     self.batch_scale.data = bscale
+                    
+                    self.initialized.data = torch.tensor(True).to(self.device)
                 else:
                     m = self.momentum
                     self.batch_loc.data = (1 - m) * self.batch_loc + m * bloc
                     self.batch_scale.data = \
                         (1 - m) * self.batch_scale + m * bscale
 
-                self.updates += 1
         else:
             bloc, bscale = self.batch_loc, self.batch_scale
 

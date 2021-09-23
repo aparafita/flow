@@ -19,7 +19,7 @@ from .utils import Module
 
 
 class Prior(Module):
-    """Prior class to encapsule distribution prior for variable U.
+    """Prior class to encapsulate the distribution prior of a variable U.
 
     Any class that inherits from Prior needs to implement:
     ```python
@@ -27,13 +27,13 @@ class Prior(Module):
         # Return n samples from this prior, mapped to the prior device.
         ...
 
-    def nll(self, u):
-        # Return the Negative Log-Likelihood (nll) of each sample in u.
+    def loglk(self, u):
+        # Return the log-likelihood of each sample in u.
         ...
     ```
-    
-    Also, set the class attribute `discrete` indicating 
-    whether the distribution is discrete or not. Defaults to False.
+    Additionally, a class attribute `discrete` must be defined 
+    indicating whether this Prior is discrete (True) or continuous (False).
+    Defaults to False.
     """
     
     discrete = False
@@ -48,12 +48,16 @@ class Prior(Module):
         self.dim = dim
 
     def sample(self, n):
-        """Sample n samples from this prior, mapped to the prior device."""
+        """Return n samples from this prior, mapped to the prior device."""
+        raise NotImplementedError()
+        
+    def loglk(self, u):
+        """Return the log-likelihood of each sample in u."""
         raise NotImplementedError()
 
     def nll(self, u):
         """Return the negative log-likelihood of samples u."""
-        raise NotImplementedError()
+        return -self.loglk(u)
 
 
 class Uniform(Prior):
@@ -62,7 +66,7 @@ class Uniform(Prior):
     def sample(self, n):
         return torch.rand(n, self.dim, device=self.device)
 
-    def nll(self, u):
+    def loglk(self, u):
         return torch.zeros_like(u[:, 0])
 
 
@@ -72,8 +76,8 @@ class Normal(Prior):
     def sample(self, n):
         return torch.randn(n, self.dim, device=self.device)
 
-    def nll(self, u):
-        return .5 * (self.dim * np.log(2 * np.pi) + (u ** 2).sum(dim=1))
+    def loglk(self, u):
+        return -.5 * (self.dim * np.log(2 * np.pi) + (u ** 2).sum(dim=1))
     
     
 class Exponential(Prior):
@@ -88,5 +92,5 @@ class Exponential(Prior):
         u = torch.rand(n, 1, device=self.device).clip(self.eps / 2, 1 - self.eps / 2)
         return -torch.log(u)
     
-    def nll(self, u):
-        return u.sum(1)
+    def loglk(self, u):
+        return -u.sum(1)

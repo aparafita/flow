@@ -17,7 +17,9 @@ from torch import nn
 import torch.nn.functional as F
 
 from .flow import Conditioner, ConditionerNet
-from .utils import Module, MultiHeadNet, prepend_cond
+from .utils import Module, prepend_cond
+
+from torch_utils.modules import MaskedLinear
 
 
 def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=None):
@@ -85,7 +87,7 @@ class AutoregressiveNaive(Conditioner):
         h_init = self.trnf._h_init()
 
         self.nets = nn.ModuleList([
-            ConditionerNet(idim + self.cond_dim, self.trnf.h_dim, h_init=init, net_f=net_f)
+            ConditionerNet(idim + self.cond_dim, self.trnf.h_dim_1d, h_init=init, net_f=net_f)
             for idim, init in zip(
                 range(self.dim),
                 (
@@ -148,39 +150,6 @@ class AutoregressiveNaive(Conditioner):
 # ------------------------------------------------------------------------------
 
 
-class MaskedLinear(nn.Linear):
-    """Extend `torch.nn.Linear` to use a boolean mask on its weights."""
-
-    def __init__(self, in_features, out_features, bias=True, mask=None):
-        """
-        Args:
-            in_features (int): size of each input sample.
-            out_features (int): size of each output sampl.
-            bias (bool): If set to False, 
-                the layer will not learn an additive bias. 
-            mask (torch.Tensor): boolean mask to apply to the weights.
-                Tensor of shape (out_features, in_features).
-                If None, defaults to an unmasked Linear layer.
-        """
-        super().__init__(in_features, out_features, bias)
-        
-        if mask is None:
-            mask = torch.ones(out_features, in_features, dtype=bool)
-        else:
-            mask = mask.bool()
-
-        assert mask.shape == (out_features, in_features)
-        self.register_buffer('mask', mask)
-
-    def forward(self, input):
-        """Extend forward to include the buffered mask."""
-        return F.linear(input, self.mask * self.weight, self.bias)
-
-    def set_mask(self, mask):
-        """Set the buffered mask to the given tensor."""
-        self.mask.data = mask
-
-
 class MADE_Net(nn.Sequential):
     """Feed-forward network with masked linear layers used for MADE."""
             
@@ -194,7 +163,7 @@ class MADE_Net(nn.Sequential):
         """
         Args:
             input_dim (int): number of inputs (flow dimension).
-            output_dim (int): number of outputs (trnf.dim * trnf.h_dim).
+            output_dim (int): number of outputs (trnf.h_dim).
                 Note that all parameters corresponding to a dimension
                 are concatenated together. Therefore, for a 3D-affine trnf:
                     mu0, sigma0, mu1, sigma1, mu2, sigma2. 
@@ -212,10 +181,7 @@ class MADE_Net(nn.Sequential):
         super().__init__()
 
         self.input_dim = input_dim
-        self.output_dim = output_dim
-
-        assert not output_dim % input_dim
-        self.h_dim = output_dim // input_dim
+        self.h_dim = self.output_dim = output_dim
 
         assert all(isinstance(m, int) and m >= 1 for m in hidden_sizes_mult)
         self.hidden_sizes = [ 
@@ -239,7 +205,7 @@ class MADE_Net(nn.Sequential):
             for m in hidden_sizes_mult
         ] + [ 
             torch.arange(1, input_dim + 1)\
-                .view(-1, 1).repeat(1, self.h_dim).flatten()
+                .view(-1, 1).repeat(1, output_dim // input_dim).flatten()
         ]
 
         # Create the actual layers
@@ -325,12 +291,12 @@ class MADE(Conditioner):
     http://papers.nips.cc/paper/6828-masked-autoregressive-flow-for-density-estimation
     """
         
-    def __init__(self, trnf, net=MADE_Net, net_kwargs=None, **kwargs):
+    def __init__(self, trnf, net_f=MADE_Net, net_kwargs=None, **kwargs):
         """
         Args:
             trnf (flow.flow.Transformer): 
                 transformer to use alongside this conditioner.
-            net (nn.Module class): network to use for MADE. 
+            net_f (nn.Module class): network to use for MADE. 
                 Must use `MaskedLinear` layers with appropriate masks. 
                 Defaults to `MADE_Net`.
         """
@@ -339,8 +305,8 @@ class MADE(Conditioner):
 
         net_kwargs = net_kwargs or {}
 
-        self.net = net(
-            self.dim, self.dim * trnf.h_dim, 
+        self.net = net_f(
+            self.dim, trnf.h_dim, 
             cond_dim=self.cond_dim,
             h_init=self.trnf._h_init(),
             **net_kwargs
@@ -362,7 +328,7 @@ class MADE(Conditioner):
 
             res = self.trnf(
                 u[:, [i]], 
-                h_i[:, self.trnf.h_dim * i : self.trnf.h_dim * (i + 1)], 
+                h_i[:, self.trnf.h_dim_1d * i : self.trnf.h_dim_1d * (i + 1)], 
                 invert=True, 
                 log_det=log_det,
                 **kwargs
@@ -408,12 +374,14 @@ class _CouplingLayersTransformer(Transformer):
     but its dim is the whole dimensionality.
     """
     
-    def __init__(self, trnf, dim=None):
-        assert dim is not None and dim in (trnf.dim * 2, trnf.dim * 2 + 1)
+    def __init__(self, trnf, **kwargs):
+        dim = kwargs.get('dim', trnf.dim)
+        assert dim in (trnf.dim * 2, trnf.dim * 2 + 1)
         
-        super().__init__(dim=dim, h_dim=trnf.h_dim)
-
+        super().__init__(dim=dim)
+        
         self.trnf = trnf
+        self.h_dim = trnf.h_dim
 
 
     # Overrides
@@ -488,7 +456,7 @@ class CouplingLayers(Conditioner):
         super().__init__(trnf, dim=dim, **kwargs)
 
         self.h_net = ConditionerNet(
-            dim - dim // 2 + self.cond_dim, dim // 2 * trnf.h_dim, 
+            dim - dim // 2 + self.cond_dim, trnf.h_dim // 2, 
             h_init=self.trnf._h_init(),
             **(net_kwargs or {})
         )
