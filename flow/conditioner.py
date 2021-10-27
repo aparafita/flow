@@ -22,7 +22,7 @@ from .utils import Module, prepend_cond
 from torch_utils.modules import MaskedLinear
 
 
-def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=None):
+def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, dropout=.5, init=None):
     assert isinstance(hidden_dim, (tuple, list)) 
     assert all(isinstance(x, int) and x > 0 for x in hidden_dim)
 
@@ -30,6 +30,11 @@ def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=Non
 
     def create_layer(n_layer, n_step):
         if n_step == 0:
+            if dropout > 0 and n_layer > 0:
+                return nn.Dropout(dropout)
+            else:
+                return None
+        elif n_step == 1:
             i = input_dim if n_layer == 0 else hidden_dim[n_layer - 1]
             o = output_dim if n_layer == n_layers - 1 else \
                 hidden_dim[n_layer]
@@ -48,7 +53,7 @@ def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=Non
             for layer in (
                 create_layer(n_layer, n_step)
                 for n_layer in range(n_layers)
-                for n_step in range(2)
+                for n_step in range(3)
             )
             if layer is not None
         )
@@ -66,6 +71,7 @@ def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, init=Non
     return net
 
 
+'''
 class AutoregressiveNaive(Conditioner):
     """Naive Autoregressive Conditioner.
 
@@ -137,13 +143,84 @@ class AutoregressiveNaive(Conditioner):
             return x
 
     def warm_start(self, x, cond=None, **kwargs):
-        super().warm_start(x, cond=cond, **kwargs)
-
         x = prepend_cond(x, cond)
         for i, net in enumerate(self.nets):
             net.warm_start(x[:, :self.cond_dim + i])
 
-        return self
+        return super().warm_start(x, cond=cond, **kwargs)
+'''
+
+class AutoregressiveNaive(Conditioner):
+    """Naive Autoregressive Conditioner.
+
+    Implements a separate network for each dimension's h parameters.
+    """
+
+    def __init__(self, trnf, net_f, **kwargs):
+        """
+        Args:
+            trnf (flow.flow.Transformer): 
+                transformer to use alongside this conditioner.
+            net_f (class): function or class with input 
+                (input_dim, output_dim, init=None) 
+                that will be used by ConditionerNet 
+                to create the Conditioner network.
+        """
+        super().__init__(trnf, **kwargs)
+
+        h_init = self.trnf._h_init()
+
+        self.nets = nn.ModuleList([
+            ConditionerNet(idim + self.cond_dim, self.trnf.h_dim_1d, h_init=init, net_f=net_f)
+            for idim, init in zip(
+                range(self.dim),
+                (
+                    h_init.view(self.dim, -1) 
+                    if h_init is not None 
+                    else [None] * self.dim
+                )
+            )
+        ])
+    
+    def _update_device(self, device):
+        super()._update_device(device)
+        
+        for net in self.nets:
+            net.device = device
+
+    # Override methods
+    def _h(self, x, cond=None):
+        x = prepend_cond(x, cond)
+
+        return torch.cat([
+            net(x[:, :self.cond_dim + i])
+            for i, net in enumerate(self.nets)
+        ], dim=1)
+
+    def _invert(self, u, cond=None, log_det=False, **kwargs):
+        x = u
+        
+        # Invert dimension per dimension sequentially
+        for i, net in enumerate(self.nets):
+            last = i == len(self.nets) - 1
+            
+            if not last:
+                x = x.detach().clone()
+                
+            h = self._h(x, cond=cond)
+            x = self.trnf(u, h, invert=True, log_det=last and log_det)
+            
+        # Note that x is (x, log_det) if log_det is True,
+        # and x otherwise. So just return x no matter what
+        return x
+
+    def warm_start(self, x, cond=None, **kwargs):
+        xcond = prepend_cond(x, cond)
+        for i, net in enumerate(self.nets):
+            net.warm_start(xcond[:, :self.cond_dim + i])
+
+        return super().warm_start(x, cond=cond, **kwargs)
+        
 
 
 # MADE

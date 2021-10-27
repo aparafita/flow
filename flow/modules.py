@@ -66,6 +66,102 @@ class Affine(Flow):
         else:
             return x
 
+
+@cache_only_in_eval
+class LowerTriangular(Flow):
+    
+    @staticmethod
+    def create_mask(N, mask=None):
+        if mask is None:
+            # Autoregressive
+            mask = [ (i, j) for i in range(N) for j in range(i + 1, N) ]
+        elif isinstance(mask, (list, tuple, set)):
+            # Make sure it's in topological order, formed of (i, j) pairs with i < j
+            assert all(
+                isinstance(t, (list, tuple)) and 
+                len(t) == 2 and 
+                t[0] < t[1] 
+                
+                for t in mask
+            )
+        elif isinstance(mask, torch.Tensor):
+            # Convert to a bool mask and 
+            # make sure it's lower triangular with an all-True diagonal
+            mask = mask.bool()
+            assert torch.diagonal(mask).all().item() and \
+                (~mask[torch.triu_indices(N, N, offset=1)]).all().item()
+            
+            return mask
+        else:
+            raise ValueError(type(mask))
+            
+        M = torch.eye(N, N, dtype=bool)
+        for i, j in mask:
+            M[j, i] = True # inverse order!
+        
+        return M
+    
+    def __init__(self, bias=True, mask=None, eps=1e-3, **kwargs):
+        super().__init__(**kwargs)
+        
+        if bias:
+            self.bias = nn.Parameter(torch.randn(self.dim))
+        else:
+            self.register_buffer('bias', torch.tensor(0.))
+            
+        self.register_buffer('mask', self.create_mask(self.dim, mask))
+        self.register_buffer('eps', torch.tensor(eps))
+        
+        # The matrix will be initialized to something close to the identity
+        eye = torch.eye(self.dim)
+        A = eye * softplus_inv(1. - self.eps) + (1 - eye) * torch.randn_like(eye) * self.eps
+        
+        self._h = nn.Parameter(A[self.mask])
+        
+        # Create a mask for the diagonal terms
+        self.register_buffer('diag_mask', torch.eye(self.dim, dtype=bool)[self.mask])
+        
+    @cache
+    def A(self):
+        A = torch.zeros(self.dim, self.dim, device=self.device)
+        eye = torch.eye(self.dim, dtype=bool, device=self.device)
+        
+        A[eye] = torch.nn.functional.softplus(self._h[self.diag_mask]) + self.eps
+        A[self.mask & ~eye] = self._h[~self.diag_mask]
+        
+        return A
+    
+    @cache
+    def A_inv(self):
+        A = self.A
+        inv, _ = torch.triangular_solve(
+            torch.eye(self.dim, device=self.device), 
+            A, upper=False
+        )
+        
+        return inv
+        
+    def _transform(self, x, log_det=False, **kwargs): 
+        # Transform x into u. Used for training.
+        A = self.A
+        u = x @ A.t() + self.bias
+        
+        if log_det:
+            return u, torch.log(torch.diagonal(A)).sum().unsqueeze(0)
+        else:
+            return u
+
+    def _invert(self, u, log_det=False, **kwargs): 
+        # Transform u into x. Used for sampling.
+        A_inv = self.A_inv
+        x = (u - self.bias) @ A_inv.t()
+        
+        if log_det:
+            return x, torch.log(torch.diagonal(A_inv)).sum().unsqueeze(0)
+        else:
+            return x
+
+
 @cache_only_in_eval
 class Linear(Flow):
     """Invertible Linear Flow based on LU decomposition."""
@@ -442,8 +538,6 @@ class BatchNorm(Flow):
         self.register_buffer('eps', torch.tensor(eps))
         self.register_buffer('momentum', torch.tensor(momentum))
 
-        self.register_buffer('initialized', torch.tensor(False))
-
         self.register_buffer('batch_loc', torch.zeros(1, self.dim))
         self.register_buffer('batch_scale', torch.ones(1, self.dim))
 
@@ -458,15 +552,15 @@ class BatchNorm(Flow):
         self.log_scale = nn.Parameter(torch.zeros(1, self.dim))
 
     def warm_start(self, x, **kwargs):
+        super().warm_start(x, **kwargs)
+        
         with torch.no_grad():
             self.batch_loc.data = x.mean(0, keepdim=True)
             self.batch_scale.data = x.std(0, keepdim=True) + self.eps
 
-            self.initialized.data = torch.tensor(True).to(self.device)
-
         return self
 
-    def _activation(self, x=None, update=None):
+    def _batch_stats(self, x=None, update=None):
         if self.training and x is not None:
             assert x.size(0) >= 2, \
                 'If training BatchNorm, pass more than 1 sample.'
@@ -476,11 +570,11 @@ class BatchNorm(Flow):
 
             # Update self.batch_loc, self.batch_scale
             with torch.no_grad():
-                if not self.initialized.item():
+                if not self.initialized:
                     self.batch_loc.data = bloc
                     self.batch_scale.data = bscale
                     
-                    self.initialized.data = torch.tensor(True).to(self.device)
+                    self.initialized = True
                 else:
                     m = self.momentum
                     self.batch_loc.data = (1 - m) * self.batch_loc + m * bloc
@@ -504,8 +598,8 @@ class BatchNorm(Flow):
         else:
             return -torch.log(bscale).sum(dim=1)
 
-    def _transform(self, x, log_det=False, **kwargs):
-        bloc, bscale, loc, scale = self._activation(x)
+    def _transform(self, x, *h, log_det=False, **kwargs):
+        bloc, bscale, loc, scale = self._batch_stats(x)
         u = (x - bloc) / bscale 
         
         if self.affine:
@@ -517,8 +611,8 @@ class BatchNorm(Flow):
         else:
             return u
 
-    def _invert(self, u, log_det=False, **kwargs):
-        bloc, bscale, loc, scale = self._activation()
+    def _invert(self, u, *h, log_det=False, **kwargs):
+        bloc, bscale, loc, scale = self._batch_stats()
         
         if self.affine:
             x = (u - loc) / scale * bscale + bloc

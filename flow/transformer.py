@@ -19,6 +19,8 @@ from .prior import Uniform
 from .modules import LogSigmoid, LeakyReLU
 from .utils import *
 
+from .splines import *
+
 
 class Affine(Transformer):
     """Affine Transformer.
@@ -365,6 +367,7 @@ class DSF(_AdamInvTransformer):
         return h_init.flatten()
 
 
+'''
 class RQ_Spline(Transformer):
     """Neural Spline Flow, implemented for the rational quadratic case.
     
@@ -438,8 +441,8 @@ class RQ_Spline(Transformer):
         # In/out of window (A, B)
         idx = (self.A <= x) & (x < self.B)
         u = torch.zeros_like(x)
-        u[x < self.A] = self.fA + (x[x < self.A] - self.A) * derivatives[..., 0][x < self.A]
-        u[x > self.B] = self.fB + (x[x > self.B] + self.B) * derivatives[..., -1][x > self.B]
+        u[x < self.A] = self.fA - (self.A - x[x < self.A]) * derivatives[..., 0][x < self.A]
+        u[x > self.B] = self.fB + (x[x > self.B] - self.B) * derivatives[..., -1][x > self.B]
 
         # Transform x into u using parameters h
         bins = ((xknots[..., :-1] <= x.unsqueeze(-1)) & (x.unsqueeze(-1) < xknots[..., 1:])).float()
@@ -494,8 +497,8 @@ class RQ_Spline(Transformer):
         # In/out of window (-B, B)
         idx = (self.A <= u) & (u < self.B)
         x = torch.zeros_like(u)
-        x[u < self.fA] = self.A + (u[u < self.fA] - self.fA) / derivatives[..., 0][u < self.fA]
-        x[u > self.fB] = self.B + (u[u > self.fB] + self.fB) / derivatives[..., -1][u > self.fB]
+        x[u < self.fA] = self.A - (self.fA - u[u < self.fA]) / derivatives[..., 0][u < self.fA]
+        x[u > self.fB] = self.B + (u[u > self.fB] - self.fB) / derivatives[..., -1][u > self.fB]
 
         # Transform x into u using parameters h
         bins = ((yknots[..., :-1] <= u.unsqueeze(-1)) & (u.unsqueeze(-1) < yknots[..., 1:])).float()
@@ -544,7 +547,82 @@ class RQ_Spline(Transformer):
             return x, -log_det
         else:
             return x
+'''
 
+class RQ_Spline(Transformer):
+    """Neural Spline Flow, implemented for the rational quadratic case.
+    
+    Based on https://arxiv.org/pdf/1906.04032.pdf
+    """
+    
+    @property
+    def K(self):
+        return self._K.item()
+    
+    @property
+    def eps(self):
+        return self._eps.item()
+    
+    def __init__(self, K=20, eps=1e-3, A=0., B=1., fA=None, fB=None, **kwargs):
+        assert isinstance(K, int) and K >= 2
+        if fA is None: fA = A
+        if fB is None: fB = B
+        assert A < B and fA < fB
+
+        super().__init__(**kwargs)
+        
+        # How many parameters? K for widths and heights, K - 1 for derivatives
+        self.h_dim_1d = 3 * K - 1
+        
+        self.register_buffer('_K', torch.tensor(int(K)))
+        self.register_buffer('A', torch.tensor(float(A)))
+        self.register_buffer('B', torch.tensor(float(B)))
+        self.register_buffer('fA', torch.tensor(float(fA)))
+        self.register_buffer('fB', torch.tensor(float(fB)))
+        self.register_buffer('_eps', torch.tensor(eps))
+        
+    def _activation(self, h, **kwargs): 
+        h = h.view(h.size(0), -1, self.h_dim_1d)
+        
+        widths, heights, derivatives = h[..., 0::3], h[..., 1::3], h[..., 2::3]
+        
+        return widths, heights, derivatives
+
+    def _h_init(self):
+        h = torch.randn(self.dim, self.h_dim_1d, device=self.device) * 1e-3
+        
+        # heights = h[0::3], which should be all 1s -> 0 pre
+        # widths = h[1::3], which should be all 1 / K -> 0 pre
+        # derivatives = h[2::3], which should be 1 -> softplus^-1(1 - self.eps)
+        
+        h[..., 2::3] += softplus_inv(1. - self._eps)
+        
+        return h.flatten()
+    
+    def _forward(self, x, widths, heights, derivatives, log_det=False, invert=False):
+        outputs, logabsdet = unconstrained_rational_quadratic_spline(
+            inputs=x,
+            unnormalized_widths=widths,
+            unnormalized_heights=heights,
+            unnormalized_derivatives=derivatives,
+            inverse=False,
+            min_bin_width=self.eps,
+            min_bin_height=self.eps,
+            min_derivative=self.eps,
+            A=self.A, B=self.B, fA=self.fA, fB=self.fB,
+        )
+        
+        if log_det:
+            return outputs, logabsdet.view(outputs.size(0), -1).sum(1)
+        else:
+            return outputs
+    
+    def _transform(self, x, *h, log_det=False, **kwargs):
+        return self._forward(x, *h, log_det=log_det, invert=False)
+
+    def _invert(self, x, *h, log_det=False, **kwargs):
+        return self._forward(x, *h, log_det=log_det, invert=True)
+    
 
 class Q_Spline(Transformer):
     """Neural Spline Flow, implemented for the quadratic case.

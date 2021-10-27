@@ -36,23 +36,40 @@ class Flow(Module):
     a standard Normal distribution by default.
 
     Any class that inherits from Flow needs to implement:
-    ```python        
-    def _transform(self, x, log_det=False, **kwargs): 
+    ```python
+    def _activation(self, h, **kwargs):
+        # Transform h by activation before calling _transform or _invert.
+        # Returns a tuple with 0 or more activated parameters.
+        ...
+        
+    def _transform(self, x, *h, log_det=False, **kwargs): 
         # Transform x into u. Used for training.
         ...
 
-    def _invert(self, u, log_det=False, **kwargs): 
+    def _invert(self, u, *h, log_det=False, **kwargs): 
         # Transform u into x. Used for sampling.
-        ...
-
-    def warm_start(self, x, **kwargs):
-        # Warm start operation for the flow, if necessary.
         ...
     ```
     
-    It also must define an `h_dim` attribute,
-    containing the total dimensionality of the flow's parameters.
-    It can be 0 or a positive integer (0 by default, if it is not defined). 
+    Also, optionally, override these methods:
+    ```python
+    def warm_start(self, x):
+        # Warm start operation for the flow, if necessary.
+        ...
+        
+    def h_init(self):
+        # Return the pre-activation initialization value for the external parameters h.
+        # Shape must be (h_dim,).
+        ...
+    ```
+    
+    Every flow must also define an `h_dim` attribute,
+    containing the total dimensionality of the external flow's parameters.
+    By this, it means that any paramater that is independent to the input
+    and can be stored as a nn.Parameter inside the flow is not considered.
+    External parameters come as a 'h' parameter of each function.
+    `h_dim` is then the total dimensionality of this h parameter.
+    `h_dim` can be 0 or a positive integer (0 by default, if it is not defined). 
     Alternatively, you can set the `h_dim_1d` attribute 
     to refer to the number of parameters per-dimension. 
     This sets h_dim automatically as self.h_dim = self.h_dim_1d * self.dim.
@@ -66,6 +83,7 @@ class Flow(Module):
 
     Remember that it's convenient for training stability to initialize
     the flow so that it performs the identity transformation (or close to it).
+    This is done by providing the appropriate value in the `h_init` method.
     """
     
     @property
@@ -76,6 +94,7 @@ class Flow(Module):
     def h_dim_1d(self, value):
         self.h_dim = value * self.dim
 
+        
     def __init__(self, dim=1, prior=None):
         """
         Args:
@@ -97,7 +116,7 @@ class Flow(Module):
             self.prior = None
 
 
-    def forward(self, t, invert=False, log_det=False, **kwargs):
+    def forward(self, t, h=None, invert=False, log_det=False, **kwargs):
         r"""Call _transform (x -> u) or _invert (u -> x) on t.
 
         Args:
@@ -114,32 +133,60 @@ class Flow(Module):
                 Tensor containing \(\log |\det J_T|\), 
                 where T is the applied transformation. 
         """
+        assert not self.h_dim or h is not None, 'If h_dim > 0, then h should be passed.'
+        h = self._activation(h, **kwargs)
+        assert isinstance(h, tuple), 'trnf._activation(h) must return a tuple'
 
         if not invert:
-            return self._transform(t, **kwargs, log_det=log_det)
+            return self._transform(t, *h, log_det=log_det, **kwargs)
         else:
-            return self._invert(t, **kwargs, log_det=log_det)
+            return self._invert(t, *h, log_det=log_det, **kwargs)
 
 
-    # Override these methods        
-    def _transform(self, x, log_det=False, **kwargs):
+    # Override these methods
+    def _activation(self, h, **kwargs):
+        """Transform h by activation before calling _transform or _invert.
+
+        Args:
+            h (torch.Tensor): tensor with the pre-activation parameters.
+        
+        Returns:
+            parameters: tuple of parameter tensors.
+
+        Example:
+            For a scale parameter, _activation could pass h
+            through a softplus function to make it positive.
+        """
+        return (h,) if h is not None else tuple()
+        
+    def _transform(self, x, h=None, log_det=False, **kwargs):
         """Transform x into u."""
         raise NotImplementedError()
 
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, h=None, log_det=False, **kwargs):
         """Transform u into x."""
         raise NotImplementedError()
+        
+    def _h_init(self):
+        """Return initialization values for pre-activation h parameters.
+        
+        Returns:
+            result: None if no initialization is required or
+                tensor with shape (h_dim,) with the initialization values.
+        """
+        return None # by default, no initialization suggested
 
-    def warm_start(self, x, **kwargs):
+    def warm_start(self, x, h=None, **kwargs):
         """Perform a warm_start operation to the flow (optional).
 
         Args:
-            x (torch.Tensor): dataset sample to use in the warming up.
+            x (torch.Tensor): dataset sample to use in warming up.
+            h (torch.Tensor): external parameters or None.
 
         Returns:
             self
         """
-        return self
+        return super().warm_start()
 
 
     # Utilities
@@ -225,148 +272,6 @@ def inv_flow(flow_cls, name=None):
     return InvFlow
 
 
-class Sequential(Flow):
-    """Flow defined by a sequence of flows.
-
-    Note that flows are specified in the order X -> U.
-    That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).
-    """
-
-    def __init__(self, *flows, **kwargs):
-        """
-        Args:
-            *flows (Flow): sequence of flows.
-        """
-
-        assert flows, 'Sequential constructor called with 0 flows'
-
-        dim = { flow.dim for flow in flows }
-        assert len(dim) == 1, \
-            'All flows in a Sequential must have the same dim'
-        dim = dim.pop() # just the one
-        assert dim == kwargs.pop('dim', dim), 'dim and flows dim do not match'
-
-        super().__init__(dim=dim, **kwargs)
-        
-        self.flows = nn.ModuleList(flows) # save flows in ModuleList
-        self.h_dim = sum(f.h_dim for f in self.flows)
-
-    # Device overrides
-    def _update_device(self, device):
-        super()._update_device(device)
-        
-        for flow in self.flows:
-            flow.device = device
-            
-    # Sequential methods
-    def append(self, flow):
-        assert flow.dim == self.dim
-        self.flows.append(flow)
-        self.h_dim += flow.h_dim # update it
-        
-    def _n_kwargs(self, kwargs):
-        '''Separate layer-specific kwargs from the rest.
-        Note that this removes these kwargs from **kwargs.
-        '''
-        
-        n_kwargs = { 
-            n: {
-                k[len(nk):]: v 
-                for k, v in kwargs.items() 
-                if k.startswith(nk) 
-            }
-            for n, nk in map(lambda n: (n, f'__{n}_'), range(len(self)))
-        }
-        
-        for n, d in n_kwargs.items():
-            for k in d:
-                kwargs.pop(f'__{n}_{k}')
-                
-        return n_kwargs
-
-    # Method overrides
-    def _transform(self, x, log_det=False, **kwargs):     
-        n_kwargs = self._n_kwargs(kwargs)
-        
-        log_det_sum = torch.zeros(1, device=x.device)
-        
-        for n, flow in enumerate(self.flows):
-            res = flow(x, log_det=log_det, **n_kwargs[n], **kwargs)
-
-            if log_det:
-                x, log_det_i = res
-                assert len(log_det_i.shape) == 1
-
-                log_det_sum = log_det_sum + log_det_i
-            else:
-                x = res
-
-        if log_det:
-            return x, log_det_sum
-        else:
-            return x
-
-    def _invert(self, u, log_det=False, **kwargs):    
-        n_kwargs = self._n_kwargs(kwargs)
-        
-        log_det_sum = torch.zeros(1, device=u.device)
-
-        for n, flow in zip(range(len(self) - 1, -1, -1), reversed(self.flows)):
-            res = flow(u, invert=True, log_det=log_det, **n_kwargs[n], **kwargs)
-
-            if log_det:
-                u, log_det_i = res
-                assert len(log_det_i.shape) == 1
-
-                log_det_sum = log_det_sum + log_det_i
-            else:
-                u = res
-
-        if log_det:
-            return u, log_det_sum
-        else:
-            return u
-    
-    # Utilities
-    def warm_start(self, x, **kwargs):
-        """Call warm_start(x, **kwargs) to each subflow.
-
-        Note that x will be progressively transformed before each 
-        call to warm_start, from x to u.
-        """
-        
-        n_kwargs = self._n_kwargs(kwargs)
-
-        for n, flow in enumerate(self.flows):
-            flow.warm_start(x, **n_kwargs[n], **kwargs)
-
-            with torch.no_grad():
-                x = flow(x, **n_kwargs[n], **kwargs)
-
-        return self
-
-    def __getitem__(self, k):
-        """Access subflows by indexing. 
-
-        Single ints return the corresponding subflow, 
-        while slices return a `Sequential` of the corresponding subflows.
-        """
-
-        if isinstance(k, int):
-            return self.flows[k]
-        elif isinstance(k, slice):
-            return Sequential(*self.flows[k])
-        else:
-            raise ValueError(k)
-
-    def __iter__(self):
-        for flow in self.flows:
-            yield flow
-            
-    def __len__(self):
-        return len(self.flows)
-
-
 class Conditioner(Flow):
     """Implement Flow by use of a conditioner and a transformer.
 
@@ -422,12 +327,10 @@ class Conditioner(Flow):
         dim = trnf.dim
         assert kwargs.pop('dim', dim) == dim
 
-        prior = kwargs.pop('prior', trnf.prior)
-
-        super().__init__(dim=dim, prior=prior, **kwargs)
+        super().__init__(dim=dim, **kwargs)
 
         self.trnf = trnf
-        self.h_dim = self.trnf.h_dim
+        self.h_dim = 0 # as the conditioner takes care of trnf.h_dim
         
         assert cond_dim >= 0
         self.cond_dim = cond_dim
@@ -442,8 +345,8 @@ class Conditioner(Flow):
 
     # Method overrides
     def forward(self, *args, cond=None, **kwargs):
-        """Extend forward to include cond attribute, for conditional flows."""
-        if self.conditional and self.cond_dim:
+        # Extend forward to include asserts on the cond attribute
+        if self.cond_dim:
             if cond is None:
                 raise ValueError('cond is None but cond_dim > 0')
             elif cond.size(1) != self.cond_dim:
@@ -455,26 +358,173 @@ class Conditioner(Flow):
 
         return super().forward(*args, cond=cond, **kwargs)
 
-    def _transform(self, x, log_det=False, cond=None, **kwargs):
+    def _transform(self, x, *h, log_det=False, cond=None, **kwargs):
+        assert not h
         h = self._h(x, cond=cond, **kwargs)
         
-        return self.trnf(x, h, log_det=log_det, **kwargs)
+        return self.trnf(x, h=h, log_det=log_det, **kwargs)
 
     # Extend warm_start to also call trnf.warm_start
-    def warm_start(self, x, **kwargs):
-        self.trnf.warm_start(x, **kwargs)
+    def warm_start(self, x, h=None, cond=None, **kwargs):
+        super().warm_start(x, h=h, cond=cond, **kwargs)
+    
+        assert h is None
+        h = self._h(x, cond=cond, **kwargs)
+        self.trnf.warm_start(x, h=h, **kwargs)
 
-        return super().warm_start(x, **kwargs)
-
+        return self
 
     # Override these methods
     def _h(self, x, cond=None, **kwargs):
         """Compute the non-activated parameters for the transformer."""
         raise NotImplementedError()
 
-    def _invert(self, u, log_det=False, cond=None, **kwargs):
+    def _invert(self, u, *h, log_det=False, cond=None, **kwargs):
         """Transform u into x."""
+        assert not h
         raise NotImplementedError()
+
+
+class Sequential(Flow):
+    """Flow defined by a sequence of flows.
+
+    Note that flows are specified in the order X -> U.
+    That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).
+    """
+
+    def __init__(self, *flow_cls, dim=1, **kwargs):
+        """
+        Args:
+            *flows (Flow): sequence of flows.
+        """
+        pass
+        """
+        assert flows, 'Sequential constructor called with 0 flows'
+
+        dim = { flow.dim for flow in flows }
+        assert len(dim) == 1, \
+            'All flows in a Sequential must have the same dim'
+        dim = dim.pop() # just the one
+        assert dim == kwargs.pop('dim', dim), 'dim and flows dim do not match'
+        
+        super().__init__(dim=dim, **kwargs)
+        
+        self.flows = nn.ModuleList(flows) # save flows in ModuleList
+        """
+        
+        assert flow_cls
+        
+        super().__init__(dim=dim, **kwargs)
+        
+        self.flows = nn.ModuleList([ cls(dim=dim) for cls in flow_cls ])
+        
+        self.h_dims = [ f.h_dim for f in self.flows ]
+        self.h_dim = sum(self.h_dims)        
+
+    # Device overrides
+    def _update_device(self, device):
+        super()._update_device(device)
+        
+        for flow in self.flows:
+            flow.device = device
+
+    # Method overrides
+    def _activation(self, h, **kwargs):
+        assert not self.h_dim or (h is not None and h.size(1) == self.h_dim)
+        
+        if h is not None:
+            h = h.view(h.size(0), self.dim, -1)
+            res = []
+            i = 0
+            for flow in self.flows:
+                j = i + flow.h_dim_1d
+                
+                if j - i:
+                    res.append(h[..., i:j].flatten(1))
+                else:
+                    res.append(None)
+
+                i = j
+        else:
+            res = [None] * len(self)
+        
+        return tuple(res)
+        
+    def _transform(self, *args, **kwargs):
+        return self._forward(*args, **kwargs, invert=False)
+    
+    def _invert(self, *args, **kwargs):
+        return self._forward(*args, **kwargs, invert=True)
+    
+    def _forward(self, x, *h, log_det=False, invert=False, **kwargs):
+        log_det_sum = torch.zeros(1, device=x.device)
+        it = zip(range(len(self) - 1, -1, -1), reversed(self.flows)) if invert else enumerate(self.flows)
+        for n, flow in it:
+            res = flow(x, h=h[n], invert=invert, log_det=log_det, **kwargs)
+
+            if log_det:
+                x, log_det_i = res
+                assert len(log_det_i.shape) == 1
+
+                log_det_sum = log_det_sum + log_det_i
+            else:
+                x = res
+
+        if log_det:
+            return x, log_det_sum
+        else:
+            return x
+        
+    def _h_init(self):
+        """Return initialization values for pre-activation h parameters.
+        
+        Returns:
+            result: None if no initialization is required or
+                tensor with shape (h_dim,) with the initialization values.
+        """
+        return torch.cat([
+            init.view(self.dim, -1)
+            for init in (f._h_init() for f in self.flows)
+            if init is not None
+        ], 1).flatten()
+    
+    # Utilities
+    def warm_start(self, x, h=None, **kwargs):
+        """Call warm_start(x, **kwargs) to each subflow.
+
+        Note that x will be progressively transformed before each 
+        call to warm_start, from x to u.
+        """
+        h = self._activation(h, **kwargs)
+
+        for n, flow in enumerate(self.flows):
+            flow.warm_start(x, h=h[n], **kwargs)
+
+            with torch.no_grad():
+                x = flow(x, h=h[n], **kwargs)
+
+        return super().warm_start(x, h=h, **kwargs)
+
+    def __getitem__(self, k):
+        """Access subflows by indexing. 
+
+        Single ints return the corresponding subflow, 
+        while slices return a `Sequential` of the corresponding subflows.
+        """
+
+        if isinstance(k, int):
+            return self.flows[k]
+        elif isinstance(k, slice):
+            return Sequential(*self.flows[k])
+        else:
+            raise ValueError(k)
+
+    def __iter__(self):
+        for flow in self.flows:
+            yield flow
+            
+    def __len__(self):
+        return len(self.flows)
         
         
 class ConditionerNet(Module):
@@ -528,17 +578,19 @@ class ConditionerNet(Module):
         else:
             return self.parameter.repeat(x.size(0), 1)
 
-    def warm_start(self, x, **kwargs):           
+    def warm_start(self, x, **kwargs):
+        super().warm_start(x, **kwargs)
+        
         if self.input_dim:
             bn = self.net[0]
             assert bn.__class__.__name__.startswith('BatchNorm')
 
             bn.running_mean.data = x.mean(0)
             bn.running_var.data = x.var(0)
-
+        
         return self
     
-    
+'''    
 class Sequential1D(Sequential):
     """Flow defined by a sequence of 1D-flows.
     
@@ -617,7 +669,7 @@ class Sequential1D(Sequential):
             # since we would need to slice the network
         else:
             return super().__getitem__(k)
-
+'''
 
 def dec_trnf_1d(func):
     """Decorator used to define a _transform/_invert method as a 1D operation.
@@ -657,7 +709,7 @@ def dec_trnf_1d(func):
         
     return f
 
-
+'''
 class Transformer(Flow):
     """Transformer class used as a part of any Conditioner-Flow.
 
@@ -685,10 +737,6 @@ class Transformer(Flow):
 
     def _invert(self, u, *h, log_det=False, **kwargs):
         # Transform u into x using parameters h.
-        ...
-
-    def _h_init(self):
-        # Return initialization values for pre-activation h parameters.
         ...
     ```
     Also, any subclass must define their `h_dim` attribute.
@@ -764,3 +812,5 @@ class Transformer(Flow):
                 tensor with shape (h_dim,) with the initialization values.
         """
         return None # by default, no initialization suggested
+'''
+Transformer = Flow
