@@ -16,69 +16,96 @@ from torch import nn
 
 import torch.nn.functional as F
 
-from .flow import Conditioner, ConditionerNet
-from .utils import Module, prepend_cond
+from .flow import Flow, Conditioner
+from .modules import Shuffle
+from .utils import Module, MaskedLinear, AdjacencyMaskedNet, topological_order, prepend_cond
 
-from torch_utils.modules import MaskedLinear
 
-
-def _basic_net(input_dim, output_dim, hidden_dim=(100, 50), nl=nn.ReLU, dropout=.5, init=None):
-    assert isinstance(hidden_dim, (tuple, list)) 
-    assert all(isinstance(x, int) and x > 0 for x in hidden_dim)
-
-    n_layers = len(hidden_dim) + 1
-
-    def create_layer(n_layer, n_step):
-        if n_step == 0:
-            if dropout > 0 and n_layer > 0:
-                return nn.Dropout(dropout)
-            else:
-                return None
-        elif n_step == 1:
-            i = input_dim if n_layer == 0 else hidden_dim[n_layer - 1]
-            o = output_dim if n_layer == n_layers - 1 else \
-                hidden_dim[n_layer]
-
-            return nn.Linear(i, o)
-        else:
-            if n_layer == n_layers - 1:
-                return None
-            else:
-                return nl()
-
-    net = nn.Sequential(
-        nn.BatchNorm1d(input_dim, affine=False),
-        *(
-            layer
-            for layer in (
-                create_layer(n_layer, n_step)
-                for n_layer in range(n_layers)
-                for n_step in range(3)
-            )
-            if layer is not None
-        )
-    )
-
-    if init is not None:
-        # Initialize all weights and biases to close to 0,
-        # and the last biases to init
-        for p in net.parameters():
-            p.data = torch.randn_like(p) * 1e-3
-
-        last_bias = net[-1].bias
-        last_bias.data = init.to(last_bias.device)
+class Constant(Conditioner):
+    
+    def __init__(self, trnf, *args, **kwargs):
+        super().__init__(trnf, *args, **kwargs)
         
-    return net
+        self._theta_param = nn.Parameter(torch.randn(trnf.theta_dim))
+        
+        init = self.trnf._theta_init()
+        if init is not None:
+            self._theta_param.data = init
+    
+    def _theta(self, x, cond=None, **kwargs): 
+        return self._theta_param.unsqueeze(0).repeat(x.size(0), 1)
 
+    def _invert(self, u, cond=None, log_abs_det=False, **kwargs): 
+        theta = self._theta(u, cond=cond, **kwargs)
+        
+        return self.trnf(u, theta=theta, log_abs_det=log_abs_det, invert=True, **kwargs)
 
-'''
+    
+class ConditionerNet(Module):
+    """Conditioner parameters network.
+
+    Used to compute the parameters theta passed to a transformer.
+    If its input_dim is 0 (i.e., a Flow of dimension 1 without conditioning),
+    returns a learnable tensor containing the required result.
+    """
+
+    def __init__(
+        self, 
+        input_dim, output_dim, theta_init=None, net_f=None
+    ):
+        """
+        Args:
+            input_dim (int): input dimensionality.
+            output_dim (int): output dimensionality. 
+                Total dimension of all parameters combined.
+            h_init (torch.Tensor): tensor of shape (output_dim,) to use as initializer.
+                If None, original initialization used.
+            net_f (function): function net_f(input_dim, output_dim, init=None)
+                that creates a network with the given input and output dimensions,
+                and possibly receives an init Tensor that,
+                when not None, indicates that the function should be set 
+                so that it always return that tensor. 
+                This helps in initializing a tensor to the identity.
+        """
+        assert net_f is not None or not input_dim, 'Must provide a net_f if input_dim > 0'
+        
+        super().__init__()
+        
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        if theta_init is not None:
+            assert theta_init.shape == (output_dim,)
+            
+        if input_dim:
+            self.net = net_f(input_dim, output_dim, init=theta_init)
+        else:
+            if theta_init is None:
+                theta_init = torch.randn(output_dim)
+
+            self.parameter = nn.Parameter(theta_init.unsqueeze(0))
+
+    def forward(self, x):
+        """Feed-forward pass."""
+        if self.input_dim:
+            return self.net(x)
+        else:
+            return self.parameter.repeat(x.size(0), 1)
+
+    def warm_start(self, x):
+        super().warm_start(x)
+        
+        if self.input_dim and hasattr(self.net, 'warm_start'):
+            self.net.warm_start(x)
+
+    
 class AutoregressiveNaive(Conditioner):
     """Naive Autoregressive Conditioner.
 
-    Implements a separate network for each dimension's h parameters.
+    Implements a separate network for each dimension's theta parameters.
     """
 
-    def __init__(self, trnf, net_f, **kwargs):
+    def __init__(self, trnf, net_f=None, **kwargs):
         """
         Args:
             trnf (flow.flow.Transformer): 
@@ -90,15 +117,20 @@ class AutoregressiveNaive(Conditioner):
         """
         super().__init__(trnf, **kwargs)
 
-        h_init = self.trnf._h_init()
+        theta_init = self.trnf._theta_init()
 
         self.nets = nn.ModuleList([
-            ConditionerNet(idim + self.cond_dim, self.trnf.h_dim_1d, h_init=init, net_f=net_f)
+            ConditionerNet(
+                idim + self.cond_dim, 
+                self.trnf.theta_dims[idim], 
+                theta_init=init, net_f=net_f
+            )
+            
             for idim, init in zip(
                 range(self.dim),
                 (
-                    h_init.view(self.dim, -1) 
-                    if h_init is not None 
+                    theta_init.view(self.dim, -1) 
+                    if theta_init is not None 
                     else [None] * self.dim
                 )
             )
@@ -111,85 +143,7 @@ class AutoregressiveNaive(Conditioner):
             net.device = device
 
     # Override methods
-    def _h(self, x, cond=None, start=0):
-        assert 0 <= start and start <= min(self.dim - 1, x.size(1))
-        x = prepend_cond(x, cond)
-
-        return torch.cat([
-            net(x[:, :self.cond_dim + i])
-            for i, net in enumerate(self.nets[start:], start)
-            if (x.size(1) == self.cond_dim and i == 0) or 
-                i <= x.size(1) - self.cond_dim
-        ], dim=1)
-
-    def _invert(self, u, cond=None, log_det=False, **kwargs):
-        x = u[:, :0] # (n, 0) tensor
-        
-        # Invert dimension per dimension sequentially
-        log_det_i = torch.zeros_like(u[:, 0])
-        for i, net in enumerate(self.nets):
-            # Obtain h_i from previously computed x
-            h_i = self._h(x, cond=cond, start=i)
-            x_i = self.trnf(u[:, [i]], h_i, invert=True, log_det=log_det)
-            if log_det:
-                x_i, log_det_i2 = x_i
-                log_det_i = log_det_i + log_det_i2
-
-            x = torch.cat([x, x_i], 1)
-
-        if log_det:
-            return x, log_det_i
-        else:
-            return x
-
-    def warm_start(self, x, cond=None, **kwargs):
-        x = prepend_cond(x, cond)
-        for i, net in enumerate(self.nets):
-            net.warm_start(x[:, :self.cond_dim + i])
-
-        return super().warm_start(x, cond=cond, **kwargs)
-'''
-
-class AutoregressiveNaive(Conditioner):
-    """Naive Autoregressive Conditioner.
-
-    Implements a separate network for each dimension's h parameters.
-    """
-
-    def __init__(self, trnf, net_f, **kwargs):
-        """
-        Args:
-            trnf (flow.flow.Transformer): 
-                transformer to use alongside this conditioner.
-            net_f (class): function or class with input 
-                (input_dim, output_dim, init=None) 
-                that will be used by ConditionerNet 
-                to create the Conditioner network.
-        """
-        super().__init__(trnf, **kwargs)
-
-        h_init = self.trnf._h_init()
-
-        self.nets = nn.ModuleList([
-            ConditionerNet(idim + self.cond_dim, self.trnf.h_dim_1d, h_init=init, net_f=net_f)
-            for idim, init in zip(
-                range(self.dim),
-                (
-                    h_init.view(self.dim, -1) 
-                    if h_init is not None 
-                    else [None] * self.dim
-                )
-            )
-        ])
-    
-    def _update_device(self, device):
-        super()._update_device(device)
-        
-        for net in self.nets:
-            net.device = device
-
-    # Override methods
-    def _h(self, x, cond=None):
+    def _theta(self, x, cond=None):
         x = prepend_cond(x, cond)
 
         return torch.cat([
@@ -197,7 +151,7 @@ class AutoregressiveNaive(Conditioner):
             for i, net in enumerate(self.nets)
         ], dim=1)
 
-    def _invert(self, u, cond=None, log_det=False, **kwargs):
+    def _invert(self, u, cond=None, log_abs_det=False, **kwargs):
         x = u
         
         # Invert dimension per dimension sequentially
@@ -207,25 +161,24 @@ class AutoregressiveNaive(Conditioner):
             if not last:
                 x = x.detach().clone()
                 
-            h = self._h(x, cond=cond)
-            x = self.trnf(u, h, invert=True, log_det=last and log_det)
+            theta = self._theta(x, cond=cond)
+            x = self.trnf(u, theta, invert=True, log_abs_det=last and log_abs_det)
             
-        # Note that x is (x, log_det) if log_det is True,
+        # Note that x is (x, log_abs_det) if log_abs_det is True,
         # and x otherwise. So just return x no matter what
         return x
 
-    def warm_start(self, x, cond=None, **kwargs):
+    def _warm_start(self, x, cond=None, **kwargs):
         xcond = prepend_cond(x, cond)
         for i, net in enumerate(self.nets):
             net.warm_start(xcond[:, :self.cond_dim + i])
 
-        return super().warm_start(x, cond=cond, **kwargs)
+        super()._warm_start(x, cond=cond, **kwargs)
         
 
 
 # MADE
 # ------------------------------------------------------------------------------
-
 
 class MADE_Net(nn.Sequential):
     """Feed-forward network with masked linear layers used for MADE."""
@@ -235,7 +188,7 @@ class MADE_Net(nn.Sequential):
         input_dim, output_dim, 
         hidden_sizes_mult=[10, 5], 
         act=nn.ReLU, use_batch_norm=True, dropout=0,
-        cond_dim=0, h_init=None,
+        cond_dim=0, theta_init=None,
     ):
         """
         Args:
@@ -251,14 +204,14 @@ class MADE_Net(nn.Sequential):
             cond_dim (int): dimensionality of the conditioning tensor, if any.
                 non-negative int. If cond_dim > 0, the cond tensor is expected 
                 to be concatenated before the input dimensions.
-            h_init (torch.Tensor): tensor to use as initializer 
+            theta_init (torch.Tensor): tensor to use as initializer 
                 of the last layer bias. If None, original initialization used.
             """
 
         super().__init__()
 
         self.input_dim = input_dim
-        self.h_dim = self.output_dim = output_dim
+        self.theta_dim = self.output_dim = output_dim
 
         assert all(isinstance(m, int) and m >= 1 for m in hidden_sizes_mult)
         self.hidden_sizes = [ 
@@ -322,12 +275,12 @@ class MADE_Net(nn.Sequential):
             if act is not None and k < len(m) - 2: # not the last one
                 self.add_module(f'{act.__name__}_{k}', act())
 
-        if h_init is not None:
+        if theta_init is not None:
             for p in self.parameters():
                 p.data = torch.randn_like(p) * 1e-3
 
             last_bias = self[-1].bias
-            last_bias.data = h_init.to(last_bias.device)
+            last_bias.data = theta_init.to(last_bias.device)
 
     def warm_start(self, x, **kwargs):
         bn = self[0]
@@ -383,64 +336,47 @@ class MADE(Conditioner):
         net_kwargs = net_kwargs or {}
 
         self.net = net_f(
-            self.dim, trnf.h_dim, 
+            self.dim, trnf.theta_dim, 
             cond_dim=self.cond_dim,
-            h_init=self.trnf._h_init(),
+            theta_init=self.trnf._theta_init(),
             **net_kwargs
         )
         
 
     # Overrides:
-    def _h(self, x, cond=None):
+    def _theta(self, x, cond=None):
         return self.net(prepend_cond(x, cond))
 
-    def _invert(self, u, log_det=False, cond=None, **kwargs):
+    def _invert(self, u, log_abs_det=False, cond=None, **kwargs):
         # Invert dimension per dimension sequentially
-        x = prepend_cond(torch.randn_like(u), cond)
-        log_det_sum = torch.zeros_like(u[:, 0])
+        x = torch.randn_like(u)
 
         for i in range(self.dim):
-            self.net.train(self.training and i == self.dim) # to avoid getting incorrect running means
-            h_i = self.net(x) # obtain h_i from previously computed x
+            self.net.train(self.training and i == self.dim - 1) # to avoid getting incorrect running means
+            
+            theta = self.net(prepend_cond(x, cond)) # obtain theta from previously computed x
 
-            res = self.trnf(
-                u[:, [i]], 
-                h_i[:, self.trnf.h_dim_1d * i : self.trnf.h_dim_1d * (i + 1)], 
+            x = self.trnf(
+                u, 
+                theta, 
                 invert=True, 
-                log_det=log_det,
+                log_abs_det=i == self.dim - 1 and log_abs_det,
                 **kwargs
             )
-
-            if log_det:
-                xi, log_det_i = res
-                log_det_sum = log_det_sum + log_det_i
-            else:
-                xi = res
-
-            x[:, [self.cond_dim + i]] = xi
         
         self.net.train(self.training) # reset self.net.training status
         
-        # Remove the cond part of x
-        x = x[:, self.cond_dim:]        
-            
-        if log_det:
-            return x, log_det_sum
-        else:
-            return x
+        return x # contains log_abs_det if log_abs_det was True
 
-    def warm_start(self, x, cond=None, **kwargs):
-        super().warm_start(x, cond=cond, **kwargs)
+    def _warm_start(self, x, cond=None, **kwargs):
         self.net.warm_start(prepend_cond(x, cond), **kwargs)
 
-        return self
+        super().warm_start(x, cond=cond, **kwargs)
+    
 # ------------------------------------------------------------------------------
 
 
-from flow.flow import Transformer
-from flow.modules import Shuffle
-
-class _CouplingLayersTransformer(Transformer):
+class _CouplingLayersTransformer(Flow):
     """Special Transformer used exclusively by CouplingLayers.
 
     Since Transformers and Conditioners need to be of the same size
@@ -451,55 +387,50 @@ class _CouplingLayersTransformer(Transformer):
     but its dim is the whole dimensionality.
     """
     
-    def __init__(self, trnf, **kwargs):
-        dim = kwargs.get('dim', trnf.dim)
-        assert dim in (trnf.dim * 2, trnf.dim * 2 + 1)
+    def __init__(self, trnf_cls, **kwargs):        
+        super().__init__(**kwargs)
         
-        super().__init__(dim=dim)
-        
-        self.trnf = trnf
-        self.h_dim = trnf.h_dim
+        self.trnf = trnf_cls(dim=self.dim // 2)
+        self.theta_dims = (0,) * (self.dim - self.dim // 2) + self.trnf.theta_dims
 
 
     # Overrides
-    def _activation(self, h, **kwargs): 
-        return self.trnf._activation(h, **kwargs)
+    def _activation(self, theta, **kwargs): 
+        return self.trnf._activation(theta, **kwargs)
 
-    def _transform(self, x, *h, log_det=False, **kwargs): 
-        # CouplingLayers will pass the whole Tensor to _transform.
-        assert x.size(1) == self.dim
-
-        x1, x2 = x[:, :self.trnf.dim], x[:, self.trnf.dim:]
-        u1 = x1
-        res2 = self.trnf._transform(x2, *h, log_det=log_det, **kwargs)
-
-        if log_det:
-            u2, log_det = res2
-
-            return torch.cat([u1, u2], 1), log_det
+    def _transform(self, x, *theta, log_abs_det=False, **kwargs): 
+        u = torch.zeros_like(x)
+        d = self.trnf.dim
+        
+        t = self.trnf._transform(x[:, -d:], *theta, log_abs_det=log_abs_det, **kwargs)
+        if log_abs_det:
+            t, det = t
+        u[:, :-d] = x[:, :-d]
+        u[:, -self.trnf.dim:] = t
+        
+        if log_abs_det:
+            return u, det
         else:
-            u2 = res2
+            return u
 
-            return torch.cat([u1, u2], 1)
-
-    def _invert(self, u2, *h, log_det=False, **kwargs):
-        # CouplingLayers will only pass the transformer split to _invert.
-        assert u2.size(1) == self.trnf.dim
-
-        res2 = self.trnf._invert(u2, *h, log_det=log_det, **kwargs)
-
-        if log_det:
-            x2, log_det = res2
-
-            return x2, log_det
+    def _invert(self, u, *theta, log_abs_det=False, **kwargs):
+        x = torch.ones_like(u) * u
+        d = self.trnf.dim
+        
+        t = self.trnf._invert(u[:, -d:], *theta, log_abs_det=log_abs_det, **kwargs)
+        if log_abs_det:
+            t, det = t
+        x[:, :-d] = u[:, :-d]
+        x[:, -d:] = t
+        
+        if log_abs_det:
+            return x, det
         else:
-            x2 = res2
-
-            return x2
-
-    def _h_init(self):
-        # Return initialization values for pre-activation h parameters.
-        return self.trnf._h_init()
+            return x
+        
+    def _theta_init(self):
+        # Return initialization values for pre-activation theta parameters.
+        return self.trnf._theta_init()
 
 
 class CouplingLayers(Conditioner):
@@ -518,57 +449,114 @@ class CouplingLayers(Conditioner):
     Remember to apply a `flow.modules.Shuffle` flow before this Conditioner.
     """
 
-    def __init__(self, trnf, dim=None, net_kwargs=None, **kwargs):
+    def __init__(self, trnf_cls, dim=1, net_f=None, **kwargs):
         """
         Args:
-            trnf (Transformer): transformer to use on the second split.
+            trnf_cls (Flow class): transformer class to use on the second split.
+                Pass a class, not an instanced transformer, as it will be instanced
+                with half the dimensionality (only the second half needs it).
             dim (int): dimension of the Conditioner. 
-                Note that its transformer must have dim // 2 dimensionality.
+            net_f (function): function(input_dim, output_dim, init=None).
         """
+        assert dim > 1
+        assert net_f is not None
 
-        assert dim is not None and dim >= 2, 'Must pass dim to CouplingLayers'
-        assert trnf.dim == dim // 2
-
-        trnf = _CouplingLayersTransformer(trnf, dim=dim)
+        trnf = _CouplingLayersTransformer(trnf_cls, dim=dim)
         super().__init__(trnf, dim=dim, **kwargs)
 
-        self.h_net = ConditionerNet(
-            dim - dim // 2 + self.cond_dim, trnf.h_dim // 2, 
-            h_init=self.trnf._h_init(),
-            **(net_kwargs or {})
+        self.theta_net = net_f(
+            dim - self.dim // 2 + self.cond_dim, trnf.theta_dim, 
+            init=self.trnf._theta_init()
         )
 
-
     # Overrides
-    def _h(self, x, cond=None, **kwargs): 
-        id_dim = self.dim - self.dim // 2
-        x1 = x[:, :id_dim]
+    def _theta(self, x, cond=None, **kwargs): 
+        return self.theta_net(prepend_cond(x[:, :-(self.dim // 2)], cond))
+
+    def _invert(self, u, cond=None, log_abs_det=False, **kwargs): 
+        theta = self.theta_net(prepend_cond(u[:, :-(self.dim // 2)], cond))
         
-        return self.h_net(prepend_cond(x1, cond))
+        return self.trnf(u, theta, invert=True, log_abs_det=log_abs_det, **kwargs)
 
-    def _invert(self, u, cond=None, log_det=False, **kwargs): 
-        id_dim = self.dim - self.dim // 2
-        u1, u2 = u[:, :id_dim], u[:, id_dim:]
-
-        x1 = u1        
-        h = self.h_net(prepend_cond(x1, cond))
-        res2 = self.trnf(u2, h, invert=True, log_det=log_det, **kwargs)
-
-        if log_det:
-            x2, log_det = res2
-
-            return torch.cat([x1, x2], 1), log_det
+    def _warm_start(self, x, cond=None, **kwargs):
+        if hasattr(self.theta_net, 'warm_start'):
+            self.theta_net.warm_start(prepend_cond(x[:, :-(self.dim // 2)], cond), **kwargs)
+        
+        super()._warm_start(x, cond=cond, **kwargs)
+        
+        
+class DAG_Conditioner(Conditioner):
+    
+    def __init__(self, *args, A=None, net_f=None, **kwargs):
+        """
+        Args:
+            A (torch.Tensor): 
+                upper-diagonal (with 0s at diagonal) 
+                boolean matrix with shape (self.dim, self.dim)
+                where A[i, j] == True means that i->j in the graph.
+                If None, autoregressive matrix is assumed (A[i, j] == (i < j)).
+            net_f (function):
+                function(input_dim, output_dim, init=None) that returns the requested network.
+        """
+        super().__init__(*args, **kwargs)
+        
+        if A is None:
+            # Autoregressive
+            A = torch.zeros(self.dim, self.dim, dtype=bool)
+            i1, i2 = torch.triu_indices(*A.shape, offset=1)
+            A[i1, i2] = True
         else:
-            x2 = res2
+            i1, i2 = torch.tril_indices(*A.shape)
+            assert A is not None and \
+                A.shape == (self.dim, self.dim) and \
+                A.dtype == torch.bool and \
+                not A[i1, i2].any().item()
+        
+        nodes = list(range(A.size(1)))
+        
+        parents = { i: set() for i in range(self.dim) }
+        for j in range(self.dim):
+            for i in range(j):
+                if A[i, j].item():
+                    parents[j].add(i)
+        
+        self.order = topological_order(nodes, parents, return_levels=True)
+        self.register_buffer('A', A)
+        
+        # Repeat A columns as many times as required for each parameter
+        # TODO: Correct this when h_dim_1d becomes a list        
+        A = torch.cat([
+            A[:, [i]].repeat(1, m)
+            for i, m in enumerate(self.trnf.theta_dims)
+        ], 1)
+        
+        if self.cond_dim:
+            A = torch.cat([ torch.ones(self.cond_dim, A.size(1), dtype=bool), A ], 0)
+        
+        self.net = AdjacencyMaskedNet(A, net_f=net_f, init=self.trnf._theta_init())        
+        
+    def _theta(self, x, cond=None, **kwargs): 
+        # Return the (non-activated) tensor of parameters h 
+        # corresponding to the given x. If this is a conditional flow,
+        # the conditioning tensor is passed as the 'cond' kwarg.
+        
+        return self.net(prepend_cond(x, cond))
 
-            return torch.cat([x1, x2], 1)
-
-    def warm_start(self, x, cond=None, **kwargs):
-        super().warm_start(x, cond=cond, **kwargs)
-
-        id_dim = self.dim - self.dim // 2
-        x1 = x[:, :id_dim]
-        x1 = prepend_cond(x1, cond)
-        self.h_net.warm_start(x1, **kwargs)
-
-        return self
+    def _invert(self, u, cond=None, log_abs_det=False, **kwargs): 
+        # Transform u into x.
+        x = torch.zeros_like(u)
+        
+        for _ in range(len(self.order) - 1):
+            with torch.no_grad():
+                h = self._theta(x, cond=cond, **kwargs)
+                x = self.trnf(u, h, invert=True, log_abs_det=False, **kwargs)
+        
+        # Finally, compute normally
+        h = self._theta(x, cond=cond, **kwargs)
+        return self.trnf(u, h, invert=True, log_abs_det=log_abs_det, **kwargs)
+    
+    def _warm_start(self, *args, **kwargs):
+        if hasattr(self.net, 'warm_start'):
+            self.net.warm_start(*args, **kwargs)
+        
+        super()._warm_start(*args, **kwargs)

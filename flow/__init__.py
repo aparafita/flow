@@ -2,4 +2,4 @@
 .. include::documentation.md
 '''
 
-from .flow import Flow, Sequential, Conditioner, inv_flow
+from .flow import Flow, inv_flow, Conditioner, Sequential

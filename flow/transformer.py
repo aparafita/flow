@@ -14,7 +14,7 @@ import torch
 from torch import nn, optim
 import torch.nn.functional as F
 
-from .flow import Transformer
+from .flow import Flow
 from .prior import Uniform
 from .modules import LogSigmoid, LeakyReLU
 from .utils import *
@@ -22,8 +22,8 @@ from .utils import *
 from .splines import *
 
 
-class Affine(Transformer):
-    """Affine Transformer.
+class Affine(Flow):
+    """Affine Flow.
     """
 
     def __init__(self, eps=1e-6, **kwargs):
@@ -34,44 +34,110 @@ class Affine(Transformer):
 
         super().__init__(**kwargs)
         
-        self.h_dim_1d = 2
+        self.theta_dims = 2
         self.eps = eps
 
-    def _log_det(self, scale):
+    def _log_abs_det(self, scale):
         return torch.log(scale).sum(dim=1)
 
-    def _activation(self, h):
+    def _activation(self, theta):
         """Returns (loc, scale) parameters."""
-        loc, scale = h[:, ::2], h[:, 1::2]
+        loc, scale = theta[:, ::2], theta[:, 1::2]
         scale = F.softplus(scale) + self.eps
 
         return loc, scale
 
-    def _transform(self, x, loc, scale, log_det=False, **kwargs):
+    def _transform(self, x, loc, scale, log_abs_det=False, **kwargs):
         u = x * scale + loc
 
-        if log_det:
-            return u, self._log_det(scale)
+        if log_abs_det:
+            return u, self._log_abs_det(scale)
         else:
             return u
 
-    def _invert(self, u, loc, scale, log_det=False, **kwargs):
+    def _invert(self, u, loc, scale, log_abs_det=False, **kwargs):
         x = (u - loc) / scale
 
-        if log_det:
-            return x, -self._log_det(scale)
+        if log_abs_det:
+            return x, -self._log_abs_det(scale)
         else:
             return x
 
-    def _h_init(self):
-        h_init = torch.zeros(self.h_dim, device=self.device)
-        h_init[1::2] = softplus_inv(torch.tensor(1. - self.eps)).item()
+    def _theta_init(self):
+        theta_init = torch.randn(self.theta_dim, device=self.device) * 1e-3
+        theta_init[1::2] += softplus_inv(torch.tensor(1. - self.eps)).item()
 
-        return h_init
+        return theta_init
+    
+    
+class ActNorm(Affine):
+    """Implementation of Activation Normalization.
+    https://arxiv.org/pdf/1807.03039.pdf
+
+    Uses Affine implementation and provides the warm_start method
+    to initialize Affine so that the transformed distribution
+    has location 0 and variance 1.
+
+    Note that ActNorm requires to be initialized with `warm_start`.
+    """
+    
+    requires_initialization = True
+
+    def __init__(self, eps=1e-6, **kwargs):
+        """
+        Args:
+            eps (float): lower-bound for the weight tensor.
+        """
+        super().__init__(**kwargs)
+        
+        self.register_buffer('_distr_log_weight', torch.zeros(self.dim))
+        self.register_buffer('distr_bias', torch.zeros(self.dim))
+
+    def _warm_start(self, x, *theta, **kwargs):
+        """Warm start for ActNorm.
+
+        Set loc and weight so that the transformed distribution
+        has location 0 and variance 1.
+        """
+
+        self._distr_log_weight.data = torch.log(x.std(0) + self.eps)
+        self.distr_bias.data = x.mean(0)
+        
+        super()._warm_start(x, *theta, **kwargs)
+        
+    @property
+    def distr_weight(self):
+        return torch.exp(self._distr_log_weight)
+        
+    def _transform(self, x, *theta, log_abs_det=False, **kwargs):
+        x = (x - self.distr_bias) / self.distr_weight
+        
+        res = super()._transform(x, *theta, log_abs_det=log_abs_det, **kwargs)
+        
+        if log_abs_det:
+            u, d = res
+            d = d - self._distr_log_weight.sum()
+            
+            return u, d
+        else:
+            return res
+    
+    def _invert(self, u, *theta, log_abs_det=False, **kwargs):
+        u = u * self.distr_weight + self.distr_bias
+        
+        res = super()._invert(u, *theta, log_abs_det=log_abs_det, **kwargs)
+        
+        if log_abs_det:
+            x, d = res
+            d = d + self._distr_log_weight.sum()
+            
+            return x, d
+        else:
+            return res       
 
 
-class _IncreasingMonotonicTransformer(Transformer):
-    """Abstract Transformer that inverts using Bijection Search, 
+class _IncreasingMonotonicFlow(Flow):
+    """Abstract Flow that inverts using Bijection Search, 
         specific for increasing monotonic transformers.
 
     Note that using this method, inversion will not be differentiable.
@@ -93,26 +159,26 @@ class _IncreasingMonotonicTransformer(Transformer):
         self.inv_eps = inv_eps
         self.inv_steps = inv_steps
 
-    def _invert(self, u, *h, log_det=False, **kwargs):
+    def _invert(self, u, *theta, log_abs_det=False, **kwargs):
         x = monotonic_increasing_bijective_search(
-            # use _transform, but without log_det
-            self._transform, u, *h, **kwargs,
+            # use _transform, but without log_abs_det
+            self._transform, u, *theta, **kwargs,
             eps=self.inv_eps, max_steps=self.inv_steps
         )
 
-        if log_det:
-            _, log_det = self._transform(u, *h, log_det=True, **kwargs)
-            return x, -log_det
+        if log_abs_det:
+            _, log_abs_det = self._transform(u, *theta, log_abs_det=True, **kwargs)
+            return x, -log_abs_det
         else:
             return x
 
 
-class _AdamInvTransformer(Transformer):
-    """Abstract Transformer that inverts using the Adam optimizer.
+class _AdamInvFlow(Flow):
+    """Abstract Flow that inverts using the Adam optimizer.
 
     Note that using this method, inversion will not be differentiable.
 
-    **CAUTION**: for any inheriting Transformers, 
+    **CAUTION**: for any inheriting Flows, 
     if you need to pass tensors as **kwargs to _invert, don't pass them inside
     lists or any another collection, pass them directly.
     Otherwise, _invert would run through their graph multiple times 
@@ -121,8 +187,8 @@ class _AdamInvTransformer(Transformer):
 
     def __init__(
         self, 
-        inv_lr=1e-1, inv_eps=1e-3, inv_steps=1000, 
-        inv_init=None, **kwargs
+        inv_lr=1e-1, inv_eps=1e-3, inv_steps=1000, inv_init=None, 
+        **kwargs
     ):
         """
         Args:
@@ -144,13 +210,12 @@ class _AdamInvTransformer(Transformer):
         self.inv_steps = inv_steps
         self.inv_init = inv_init
 
-    def _invert(self, u, *h, log_det=False, inv_init=None, **kwargs):
-        # _invert should be called inside a torch.no_grad(), 
-        # since this operation will not be invertible
+    def _invert(self, u, *theta, log_abs_det=False, inv_init=None, **kwargs):
+        # This operation will not be invertible, so use no_grad
         with torch.no_grad():
             # Avoid running twice through the graph
             u = u.clone()
-            h = tuple(hi.clone() for hi in h)
+            theta = tuple(theta_i.clone() for theta_i in theta)
 
             for k, v in kwargs.items():
                 if isinstance(v, torch.Tensor):
@@ -163,7 +228,7 @@ class _AdamInvTransformer(Transformer):
             elif self.inv_init is None:
                 x = nn.Parameter(torch.randn_like(u))
             else:
-                x = nn.Parameter(self.inv_init(u, *h, **kwargs))
+                x = nn.Parameter(self.inv_init(u, *theta, **kwargs))
             
             # Howewer, we do need to enable gradients here to use the optimizer.
             with torch.enable_grad(): 
@@ -171,7 +236,7 @@ class _AdamInvTransformer(Transformer):
                 
                 for _ in range(self.inv_steps):
                     loss = (
-                        (u - self._transform(x, *h, **kwargs)) ** 2
+                        (u - self._transform(x, *theta, **kwargs)) ** 2
                     ).mean()
                     
                     if loss.item() < self.inv_eps:
@@ -183,18 +248,18 @@ class _AdamInvTransformer(Transformer):
 
                 x = x.data # get the data from the parameter
                 
-            if log_det:
-                _, log_det = self._transform(
-                    x, *h, **kwargs, log_det=True
+            if log_abs_det:
+                _, log_abs_det = self._transform(
+                    x, *theta, **kwargs, log_abs_det=True
                 )
-                log_det = -log_det # we're inverting
+                log_abs_det = -log_abs_det # we're inverting
                 
-                return x, log_det
+                return x, log_abs_det
             else:
                 return x
 
 
-class NonAffine(_AdamInvTransformer):
+class NonAffine(_AdamInvFlow):
     '''Non-affine transformer.
 
     https://arxiv.org/abs/1912.02762
@@ -210,26 +275,25 @@ class NonAffine(_AdamInvTransformer):
         """
         super().__init__(**kwargs)
         
-        self.h_dim_1d = 3 * k + 1
+        self.theta_dims = 3 * k + 1
         self.k = k
         self.nl = nl()
         self.eps = eps
 
-    def _activation(self, h):
+    def _activation(self, theta):
         """Returns (weight, loc, scale, bias) parameters."""
-        assert h.shape[1] == self.h_dim
+        assert theta.shape[1] == self.theta_dim
         
-        h = h.view(h.size(0), -1, self.h_dim_1d)
-        loc, scale, log_weight = h[..., :-1:3], h[..., 1:-1:3], h[..., 2:-1:3]
-        bias = h[..., -1]
+        theta = theta.view(theta.size(0), self.dim, -1)
+        loc, scale, log_weight = theta[..., :-1:3], theta[..., 1:-1:3], theta[..., 2:-1:3]
+        bias = theta[..., -1]
 
         scale = F.softplus(scale) + self.eps
         log_weight = F.log_softmax(log_weight, dim=2)
 
         return log_weight, loc, scale, bias
 
-    def _transform(self, u, *h, log_det=False, **kwargs):
-        log_weight, loc, scale, bias = h
+    def _transform(self, u, log_weight, loc, scale, bias, log_abs_det=False, **kwargs):
         z = u.unsqueeze(2) * scale + loc
 
         # We need the derivative of each dimension individually,
@@ -237,13 +301,13 @@ class NonAffine(_AdamInvTransformer):
         shape = z.shape # save the original shape for later
         z = z.view(-1, 1)
         
-        nl_res = self.nl(z, log_det=log_det)
-        if log_det:
-            nl_z, log_det_i = nl_res
-            log_det_i = log_det_i.view(*shape) # restore shape
+        nl_res = self.nl(z, log_abs_det=log_abs_det)
+        if log_abs_det:
+            nl_z, log_abs_det_i = nl_res
+            log_abs_det_i = log_abs_det_i.view(*shape) # restore shape
 
-            log_det_i = log_sum_exp_trick(
-                log_weight + log_det_i + torch.log(scale)
+            log_abs_det_i = log_sum_exp_trick(
+                log_weight + log_abs_det_i + torch.log(scale)
             ).sum(dim=1)
         else:
             nl_z = nl_res
@@ -251,30 +315,30 @@ class NonAffine(_AdamInvTransformer):
         nl_z = nl_z.view(*shape) # restore shape
         x = (nl_z * torch.exp(log_weight)).sum(dim=2) + bias
 
-        if log_det:
-            return x, log_det_i
+        if log_abs_det:
+            return x, log_abs_det_i
         else:
             return x
 
-    def _h_init(self):
-        h_init = torch.zeros(self.dim, self.h_dim_1d, device=self.device)
+    def _theta_init(self):
+        theta_init = torch.randn(self.theta_dim, device=self.device).view(self.dim, -1) * 1e-3
         # loc and bias 0, scale 1
         # weight can be random, since all components return the same result
 
-        # h_init[:, :-1:3] = 0 # loc
-        h_init[:, 1:-1:3] = softplus_inv(
+        # theta_init[:, :-1:3] = 0 # loc
+        theta_init[:, 1:-1:3] += softplus_inv(
             torch.tensor(1. - self.eps)
         ).item() # scale
-        h_init[:, 2:-1:3] = torch.randn(
-            self.dim, self.h_dim_1d // 3, device=self.device
+        theta_init[:, 2:-1:3] += torch.randn(
+            self.dim, self.theta_dims[0] // 3, device=self.device
         ) # log_weight
         
-        h_init[:, -1] = 0 # bias
+        # theta_init[:, -1] = 0 # bias
 
-        return h_init.flatten()
+        return theta_init.flatten()
 
 
-class DSF(_AdamInvTransformer):
+class DSF(_AdamInvFlow):
     """Deep Sigmoidal Flow.
 
     https://arxiv.org/abs/1804.00779
@@ -290,266 +354,80 @@ class DSF(_AdamInvTransformer):
 
         super().__init__(**kwargs)
         
-        self.h_dim_1d = 3 * k
+        self.theta_dims = 3 * k
 
         self.k = k
-        self.eps = eps
+        self.register_buffer('eps', torch.tensor(eps))
         self.ls = LogSigmoid(dim=self.dim, alpha=alpha)
 
-    def _activation(self, h):
+    def _activation(self, theta):
         """Returns (loc, scale, w, loc_post, scale_post) parameters."""
-        h = h.view(h.size(0), -1, self.h_dim_1d)
+        theta = theta.view(theta.size(0), self.dim, -1)
 
-        loc, scale, log_w = h[..., ::3], h[..., 1::3], h[..., 2::3]
+        loc, scale, log_w = theta[..., ::3], theta[..., 1::3], theta[..., 2::3]
         
         scale = F.softplus(scale) + self.eps
         log_w = F.log_softmax(log_w, dim=2)
         
         return loc, scale, log_w
 
-    def _transform(self, x, *h, log_det=False, **kwargs):
-        # TODO: Avoid computing log_det if not requested
-        loc, scale, log_w = h
-
+    def _transform(self, x, loc, scale, log_w, log_abs_det=False, **kwargs):
+        # TODO: Avoid computing log_abs_det if not requested
         z = scale * x.unsqueeze(2) + loc
 
         # We need the derivative of each dimension individually,
         # so we need to reshape to (-1, 1) first.
         shape = z.shape # save the original shape for later
         
-        z, log_det_z = self.ls(z.view(-1, 1), log_det=True)
+        z, log_abs_det_z = self.ls(z.view(-1, 1), log_abs_det=True)
 
         # Restore shape
         z = z.view(*shape)
-        log_det_z = log_det_z.view(*shape)
+        log_abs_det_z = log_abs_det_z.view(*shape)
 
         z2 = log_sum_exp_trick(log_w + z) # this removes the 3rd dimension
         
         # Again, we need the derivative of each dimension
         shape = z2.shape # save shape
 
-        u, log_det_u = self.ls(z2.view(-1, 1), invert=True, log_det=True)
+        u, log_abs_det_u = self.ls(z2.view(-1, 1), invert=True, log_abs_det=True)
         
         # Restore shape
         u = u.view(*shape)
-        log_det_u = log_det_u.view(*shape)
+        log_abs_det_u = log_abs_det_u.view(*shape)
 
-        # Finally, compute log_det if required
-        if log_det:
-            log_det = (
-                log_det_u +
+        # Finally, compute log_abs_det if required
+        if log_abs_det:
+            log_abs_det = (
+                log_abs_det_u +
                 -z2 +
                 log_sum_exp_trick(
                     log_w + 
                     z + 
-                    log_det_z + 
+                    log_abs_det_z + 
                     torch.log(scale)
                 )
             ).sum(dim=1)
 
-            return u, log_det
+            return u, log_abs_det
         else:
             return u
 
-    def _h_init(self):
-        h_init = torch.zeros(self.dim, self.h_dim_1d, device=self.device)
+    def _theta_init(self):
+        theta_init = torch.randn(self.theta_dim, device=self.device).view(self.dim, -1) * 1e-3
         # loc 0, scale 1
         # weight can be random, since all components return the same result
 
-        # h_init[:, ::3] = 0 # loc
-        h_init[:, 1::3] = softplus_inv(
-            torch.tensor(1. - self.eps)
-        ).item() # scale
-        h_init[:, 2::3] = torch.randn(
-            self.dim, self.h_dim_1d // 3, device=self.device
+        # theta_init[:, ::3] = 0 # loc
+        theta_init[:, 1::3] += softplus_inv(1. - self.eps) # scale
+        theta_init[:, 2::3] += torch.randn(
+            self.dim, self.theta_dims[0] // 3, device=self.device
         ) # log_weight
 
-        return h_init.flatten()
+        return theta_init.flatten()
 
-
-'''
-class RQ_Spline(Transformer):
-    """Neural Spline Flow, implemented for the rational quadratic case.
     
-    Based on https://arxiv.org/pdf/1906.04032.pdf
-    """
-    
-    @property
-    def K(self):
-        return self._K.item()
-    
-    @property
-    def width(self):
-        return self.B - self.A
-    
-    @property
-    def f_width(self):
-        return self.fB - self.fA
-    
-    def __init__(self, K=20, eps=1e-3, A=0., B=1., fA=None, fB=None, **kwargs):
-        assert isinstance(K, int) and K >= 2
-        assert A < B
-        
-        if fA is None: fA = A
-        if fB is None: fB = B
-
-        super().__init__(**kwargs)
-        
-        # How many parameters? K for widths and heights, K - 1 for derivatives
-        self.h_dim_1d = 3 * K + 1
-        
-        self.register_buffer('_K', torch.tensor(int(K)))
-        self.register_buffer('A', torch.tensor(float(A)))
-        self.register_buffer('B', torch.tensor(float(B)))
-        self.register_buffer('fA', torch.tensor(float(fA)))
-        self.register_buffer('fB', torch.tensor(float(fB)))
-        self.register_buffer('eps', torch.tensor(eps))
-        
-    def _activation(self, h, **kwargs): 
-        h = h.view(h.size(0), -1, self.h_dim_1d)
-        
-        derivatives, widths, heights = h[..., 0::3], h[..., 1::3], h[..., 2::3]
-        
-        derivatives = torch.nn.functional.softplus(derivatives) + self.eps
-        widths = (self.eps + (1 - self.eps * self.K) * torch.softmax(widths, -1)) * self.width
-        heights = (self.eps + (1 - self.eps * self.K) * torch.softmax(heights, -1)) * self.f_width
-        
-        xknots = torch.cat(
-            [torch.zeros_like(widths[..., :1]), torch.cumsum(widths, -1)], -1
-        ) + self.A
-        
-        yknots = torch.cat(
-            [torch.zeros_like(heights[..., :1]), torch.cumsum(heights, -1)], -1
-        ) + self.fA
-        
-        s = (yknots[..., 1:] - yknots[..., :-1]) / (xknots[..., 1:] - xknots[..., :-1])
-        
-        return widths, heights, derivatives, xknots, yknots, s
-
-    def _h_init(self):
-        h = torch.randn(self.dim, self.h_dim_1d, device=self.device) * 1e-1
-        
-        # heights = h[0::3], which should be all 1s -> 0 pre
-        # widths = h[1::3], which should be all 1 / K -> 0 pre
-        # derivatives = h[2::3], which should be 1 -> softplus^-1(1 - self.eps)
-        
-        h[..., 0::3] += softplus_inv(1. - self.eps)
-        
-        return h.flatten()
-    
-    def _transform(self, x, widths, heights, derivatives, xknots, yknots, s, log_det=False, **kwargs):
-        # In/out of window (A, B)
-        idx = (self.A <= x) & (x < self.B)
-        u = torch.zeros_like(x)
-        u[x < self.A] = self.fA - (self.A - x[x < self.A]) * derivatives[..., 0][x < self.A]
-        u[x > self.B] = self.fB + (x[x > self.B] - self.B) * derivatives[..., -1][x > self.B]
-
-        # Transform x into u using parameters h
-        bins = ((xknots[..., :-1] <= x.unsqueeze(-1)) & (x.unsqueeze(-1) < xknots[..., 1:])).float()
-
-        xk, xk1 = (xknots[..., :-1] * bins).sum(-1), (xknots[..., 1:] * bins).sum(-1)
-        yk, yk1 = (yknots[..., :-1] * bins).sum(-1), (yknots[..., 1:] * bins).sum(-1)
-        dk, dk1 = (derivatives[..., :-1] * bins).sum(-1), (derivatives[..., 1:] * bins).sum(-1)
-        sk = (s * bins).sum(-1)
-
-        # Note that we can get to nans if x was outside bounds.
-        # Filter all these terms to idx:
-        x = x[idx]
-        xk = xk[idx]
-        xk1 = xk1[idx]
-        yk = yk[idx]
-        yk1 = yk1[idx]
-        dk = dk[idx]
-        dk1 = dk1[idx]
-        sk = sk[idx]
-        
-        e = ((x - xk) / (xk1 - xk))
-
-        u[idx] = (yk + (
-            (yk1 - yk) * (sk * e ** 2 + dk * e * (1 - e))
-        ) / (
-            sk + (dk1 + dk - 2 * sk) * e * (1 - e)
-        ))
-        
-        if log_det:
-            log_det = torch.zeros_like(u)
-            
-            log_det[u < self.fA] = torch.log(derivatives[..., 0][u < self.fA])
-            log_det[u > self.fB] = torch.log(derivatives[..., -1][u > self.fB])
-            
-            log_det[idx] = (
-                (
-                    2 * torch.log(sk) + torch.log(
-                        dk1 * e ** 2 + 2 * sk * e * (1 - e) + dk * (1 - e) ** 2
-                    )
-                ) - (
-                    2 * torch.log(sk + (dk1 + dk - 2 * sk) * e * (1 - e))
-                )
-            )
-            log_det = log_det.sum(1)
-            assert log_det.shape == (u.size(0),)
-            
-            return u, log_det
-        else:
-            return u
-
-    def _invert(self, u, widths, heights, derivatives, xknots, yknots, s, log_det=False, **kwargs):
-        # In/out of window (-B, B)
-        idx = (self.A <= u) & (u < self.B)
-        x = torch.zeros_like(u)
-        x[u < self.fA] = self.A - (self.fA - u[u < self.fA]) / derivatives[..., 0][u < self.fA]
-        x[u > self.fB] = self.B + (u[u > self.fB] - self.fB) / derivatives[..., -1][u > self.fB]
-
-        # Transform x into u using parameters h
-        bins = ((yknots[..., :-1] <= u.unsqueeze(-1)) & (u.unsqueeze(-1) < yknots[..., 1:])).float()
-
-        xk, xk1 = (xknots[..., :-1] * bins).sum(-1), (xknots[..., 1:] * bins).sum(-1)
-        yk, yk1 = (yknots[..., :-1] * bins).sum(-1), (yknots[..., 1:] * bins).sum(-1)
-        dk, dk1 = (derivatives[..., :-1] * bins).sum(-1), (derivatives[..., 1:] * bins).sum(-1)
-        sk = (s * bins).sum(-1)
-        
-        # Note that we can get to nans if x was outside bounds.
-        # Filter all these terms to idx:
-        u = u[idx]
-        xk = xk[idx]
-        xk1 = xk1[idx]
-        yk = yk[idx]
-        yk1 = yk1[idx]
-        dk = dk[idx]
-        dk1 = dk1[idx]
-        sk = sk[idx]
-
-        a = (yk1 - yk) * (sk - dk) + (u - yk) * (dk1 + dk - 2 * sk)
-        b = (yk1 - yk) * dk - (u - yk) * (dk1 + dk - 2 * sk)
-        c = -sk * (u - yk)
-
-        e = 2 * c / (-b - torch.sqrt(b ** 2 - 4 * a * c))
-        x[idx] = (e * (xk1 - xk) + xk)
-        
-        if log_det:
-            log_det = torch.zeros_like(x)
-            
-            log_det[x < self.fA] = -torch.log(derivatives[..., 0][x < self.fA])
-            log_det[x > self.fB] = -torch.log(derivatives[..., -1][x > self.fB])
-            
-            log_det[idx] = (
-                (
-                    2 * torch.log(sk) + torch.log(
-                        dk1 * e ** 2 + 2 * sk * e * (1 - e) + dk * (1 - e) ** 2
-                    )
-                ) - (
-                    2 * torch.log(sk + (dk1 + dk - 2 * sk) * e * (1 - e))
-                )
-            )
-            log_det = log_det.sum(1)
-            assert log_det.shape == (x.size(0),)
-            
-            return x, -log_det
-        else:
-            return x
-'''
-
-class RQ_Spline(Transformer):
+class RQ_Spline(Flow):
     """Neural Spline Flow, implemented for the rational quadratic case.
     
     Based on https://arxiv.org/pdf/1906.04032.pdf
@@ -572,7 +450,7 @@ class RQ_Spline(Transformer):
         super().__init__(**kwargs)
         
         # How many parameters? K for widths and heights, K - 1 for derivatives
-        self.h_dim_1d = 3 * K - 1
+        self.theta_dims = 3 * K - 1
         
         self.register_buffer('_K', torch.tensor(int(K)))
         self.register_buffer('A', torch.tensor(float(A)))
@@ -581,25 +459,25 @@ class RQ_Spline(Transformer):
         self.register_buffer('fB', torch.tensor(float(fB)))
         self.register_buffer('_eps', torch.tensor(eps))
         
-    def _activation(self, h, **kwargs): 
-        h = h.view(h.size(0), -1, self.h_dim_1d)
+    def _activation(self, theta, **kwargs): 
+        theta = theta.view(theta.size(0), self.dim, -1)
         
-        widths, heights, derivatives = h[..., 0::3], h[..., 1::3], h[..., 2::3]
+        widths, heights, derivatives = theta[..., 0::3], theta[..., 1::3], theta[..., 2::3]
         
         return widths, heights, derivatives
 
-    def _h_init(self):
-        h = torch.randn(self.dim, self.h_dim_1d, device=self.device) * 1e-3
+    def _theta_init(self):
+        theta = torch.randn(self.theta_dim, device=self.device).view(self.dim, -1) * 1e-3
         
-        # heights = h[0::3], which should be all 1s -> 0 pre
-        # widths = h[1::3], which should be all 1 / K -> 0 pre
-        # derivatives = h[2::3], which should be 1 -> softplus^-1(1 - self.eps)
+        # heights = theta[0::3], which should be all 1s -> 0 pre
+        # widths = theta[1::3], which should be all 1 / K -> 0 pre
+        # derivatives = theta[2::3], which should be 1 -> softplus^-1(1 - self.eps)
         
-        h[..., 2::3] += softplus_inv(1. - self._eps)
+        theta[..., 2::3] += softplus_inv(1. - self._eps)
         
-        return h.flatten()
+        return theta.flatten()
     
-    def _forward(self, x, widths, heights, derivatives, log_det=False, invert=False):
+    def _forward(self, x, widths, heights, derivatives, log_abs_det=False, invert=False):
         outputs, logabsdet = unconstrained_rational_quadratic_spline(
             inputs=x,
             unnormalized_widths=widths,
@@ -612,19 +490,19 @@ class RQ_Spline(Transformer):
             A=self.A, B=self.B, fA=self.fA, fB=self.fB,
         )
         
-        if log_det:
+        if log_abs_det:
             return outputs, logabsdet.view(outputs.size(0), -1).sum(1)
         else:
             return outputs
     
-    def _transform(self, x, *h, log_det=False, **kwargs):
-        return self._forward(x, *h, log_det=log_det, invert=False)
+    def _transform(self, x, *theta, log_abs_det=False, **kwargs):
+        return self._forward(x, *theta, log_abs_det=log_abs_det, invert=False)
 
-    def _invert(self, x, *h, log_det=False, **kwargs):
-        return self._forward(x, *h, log_det=log_det, invert=True)
+    def _invert(self, x, *theta, log_abs_det=False, **kwargs):
+        return self._forward(x, *theta, log_abs_det=log_abs_det, invert=True)
     
 
-class Q_Spline(Transformer):
+class Q_Spline(Flow):
     """Neural Spline Flow, implemented for the quadratic case.
     
     Models distributions from and to the unit hypercube [0, 1]^K. 
@@ -645,15 +523,15 @@ class Q_Spline(Transformer):
         
         # How many parameters? K for the widths (not considering 0 and 1)
         # and K + 1 for each cut output value.
-        self.h_dim_1d = 2 * K + 1
+        self.theta_dims = 2 * K + 1
         
         self.register_buffer('_K', torch.tensor(int(K)))
         self.register_buffer('eps', torch.tensor(eps))
         
-    def _activation(self, h, **kwargs): 
-        h = h.view(h.size(0), -1, self.h_dim_1d)
+    def _activation(self, theta, **kwargs): 
+        theta = theta.view(theta.size(0), self.dim, -1)
         
-        heights, widths = h[..., 0::2], h[..., 1::2]
+        heights, widths = theta[..., 0::2], theta[..., 1::2]
         widths = torch.softmax(widths, -1)
         
         heights = torch.exp(heights) / (
@@ -665,28 +543,28 @@ class Q_Spline(Transformer):
 
         return widths.flatten(1), heights.flatten(1)
 
-    def _h_init(self):
-        h = torch.randn(self.dim, self.h_dim_1d, device=self.device) * 1e-1
+    def _theta_init(self):
+        theta = torch.randn(self.theta_dim, device=self.device).view(self.dim, -1) * 1e-3
         
-        # heights = h[:, 0::2], which should be all 1s -> 0 pre
-        # widths = h[:, 1::2], which should be all 1 / K -> 0 pre
+        # heights = theta[:, 0::2], which should be all 1s -> 0 pre
+        # widths = theta[:, 1::2], which should be all 1 / K -> 0 pre
         
-        return h.flatten()
+        return theta.flatten()
     
     def _lerp(self, a, b, x):
         return (b - a) * x + a
     
-    def _log_det(self, heights, bins, alpha):
+    def _log_abs_det(self, heights, bins, alpha):
         return torch.log(self._lerp(
             (heights[..., :-1] * bins).sum(-1),
             (heights[..., 1:] * bins).sum(-1),
             alpha
         )).sum(1)
 
-    def _preprocess_h(self, widths, heights):
+    def _preprocess_theta(self, widths, heights):
         widths, heights = tuple(
-            h.view(h.size(0), -1, self.h_dim_1d) 
-            for h in [widths, heights]
+            theta.view(theta.size(0), self.dim, -1)
+            for theta in [widths, heights]
         )
 
         cuts = torch.cat([
@@ -696,12 +574,12 @@ class Q_Spline(Transformer):
 
         return widths, heights, cuts
 
-    def _transform(self, x, widths, heights, log_det=False, **kwargs): 
+    def _transform(self, x, widths, heights, log_abs_det=False, **kwargs): 
         x = x.clamp(self.eps / 2, 1 - self.eps / 2)
 
-        widths, heights, cuts = self._preprocess_h(widths, heights)
+        widths, heights, cuts = self._preprocess_theta(widths, heights)
 
-        # Transform x into u using parameters h.
+        # Transform x into u using parameters theta.
         x = x.unsqueeze(-1)
         bins = (cuts[..., :-1] <= x) & (x < cuts[..., 1:])
         
@@ -718,17 +596,17 @@ class Q_Spline(Transformer):
 
         u = u.clamp(self.eps / 2, 1 - self.eps / 2)
         
-        if log_det:
-            return u, self._log_det(heights, bins, alpha)
+        if log_abs_det:
+            return u, self._log_abs_det(heights, bins, alpha)
         else:
             return u
 
-    def _invert(self, u, widths, heights, log_det=False, **kwargs):
+    def _invert(self, u, widths, heights, log_abs_det=False, **kwargs):
         u = u.clamp(self.eps / 2, 1 - self.eps / 2)
 
-        widths, heights, cuts = self._preprocess_h(widths, heights)
+        widths, heights, cuts = self._preprocess_theta(widths, heights)
 
-        # Transform u into x using parameters h.
+        # Transform u into x using parameters theta.
         u = u.unsqueeze(-1)
         
         y_cuts = torch.cumsum(
@@ -776,7 +654,7 @@ class Q_Spline(Transformer):
 
         x = x.clamp(self.eps / 2, 1 - self.eps / 2)
         
-        if log_det:
-            return x, -self._log_det(heights, bins, alpha)
+        if log_abs_det:
+            return x, -self._log_abs_det(heights, bins, alpha)
         else:
             return x

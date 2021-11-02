@@ -10,63 +10,6 @@ from .flow import Flow
 from .utils import softplus, softplus_inv, logsigmoid, cache, cache_only_in_eval
 
 
-class Affine(Flow):
-    """Learnable Affine Flow.
-
-    Applies weight[i] * x[i] + bias[i], 
-    where weight and bias are learnable parameters.
-    """
-
-    def __init__(self, weight=None, bias=None, **kwargs):
-        """
-        Args:
-            weight (torch.Tensor): initial value for the weight parameter. 
-                If None, initialized to torch.ones(1, self.dim).
-            bias (torch.Tensor): initial value for the bias parameter. 
-                If None, initialized to torch.zeros(1, self.dim).
-        """
-        super().__init__(**kwargs)
-
-        if weight is None:
-            weight = torch.ones(1, self.dim)
-
-        assert (weight > 0).all()
-        self.log_weight = nn.Parameter(torch.log(weight))
-
-        if bias is None:
-            bias = torch.zeros(1, self.dim)
-
-        self.bias = nn.Parameter(bias)
-
-    def _log_det(self):
-        """Used to compute _log_det for _transform."""
-        return self.log_weight.sum(dim=1)
-
-    def _h(self):
-        """Compute the parameters for this flow."""
-        return torch.exp(self.log_weight), self.bias
-
-    def _transform(self, x, log_det=False, **kwargs):
-        weight, bias = self._h()
-
-        u = weight * x + bias
-
-        if log_det:
-            return u, self._log_det()
-        else:
-            return u
-
-    def _invert(self, u, log_det=False, **kwargs):
-        weight, bias = self._h()
-
-        x = (u - bias) / weight
-
-        if log_det:
-            return x, -self._log_det()
-        else:
-            return x
-
-
 @cache_only_in_eval
 class LowerTriangular(Flow):
     
@@ -141,22 +84,22 @@ class LowerTriangular(Flow):
         
         return inv
         
-    def _transform(self, x, log_det=False, **kwargs): 
+    def _transform(self, x, log_abs_det=False, **kwargs): 
         # Transform x into u. Used for training.
         A = self.A
         u = x @ A.t() + self.bias
         
-        if log_det:
+        if log_abs_det:
             return u, torch.log(torch.diagonal(A)).sum().unsqueeze(0)
         else:
             return u
 
-    def _invert(self, u, log_det=False, **kwargs): 
+    def _invert(self, u, log_abs_det=False, **kwargs): 
         # Transform u into x. Used for sampling.
         A_inv = self.A_inv
         x = (u - self.bias) @ A_inv.t()
         
-        if log_det:
+        if log_abs_det:
             return x, torch.log(torch.diagonal(A_inv)).sum().unsqueeze(0)
         else:
             return x
@@ -219,27 +162,27 @@ class Linear(Flow):
         
         return inv
     
-    def _log_det(self, x, L, U):
+    def _log_abs_det(self, x, L, U):
         return torch.log(torch.abs(torch.diag(U))).sum().repeat(x.size(0))
     
-    def _transform(self, x, log_det=False, **kwargs): 
+    def _transform(self, x, log_abs_det=False, **kwargs): 
         # Transforms x into u. Used for training.
         L, U = self.L, self.U
             
         u = (L @ (U @ x.t())).t() + self.bias
         
-        if log_det:
-            return u, self._log_det(x, L, U)
+        if log_abs_det:
+            return u, self._log_abs_det(x, L, U)
         else:
             return u
             
-    def _invert(self, u, log_det=False, **kwargs): 
+    def _invert(self, u, log_abs_det=False, **kwargs): 
         # Transforms u into x. Used for sampling.
         L, U, inv = self.L, self.U, self.inv
         x = (inv @ (u - self.bias).t()).t()
         
-        if log_det:
-            return x, -self._log_det(x, L, U)
+        if log_abs_det:
+            return x, -self._log_abs_det(x, L, U)
         else:
             return x
         
@@ -259,7 +202,7 @@ class Scaler(Flow):
         
         self.logscale = nn.Parameter(torch.randn(1, self.dim))
 
-    def _log_det(self, x):
+    def _log_abs_det(self, x):
         return self.logscale.sum(1)
     
     @property
@@ -267,28 +210,26 @@ class Scaler(Flow):
         return torch.exp(self.logscale) + self.eps
 
     # Override methods
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_abs_det=False, **kwargs):
         u = x * self.scale
 
-        if log_det:
-            return u, self._log_det(x)
+        if log_abs_det:
+            return u, self._log_abs_det(x)
         else:
             return u
 
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_abs_det=False, **kwargs):
         x = u / self.scale
 
-        if log_det:
-            return x, -self._log_det(x)
+        if log_abs_det:
+            return x, -self._log_abs_det(x)
         else:
             return x 
 
-    def warm_start(self, x, cond=None, **kwargs):
-        super().warm_start(x, cond=cond, **kwargs)
-
+    def _warm_start(self, x, **kwargs):
         self.logscale.data = torch.log(x.std(0, keepdim=True))
-
-        return self
+        
+        super()._warm_start(x, **kwargs)
     
     
 class Power(Flow):
@@ -302,23 +243,23 @@ class Power(Flow):
         self.register_buffer('power', torch.tensor(float(power)))
         self.register_buffer('eps', torch.tensor(eps))
         
-    def _log_det(self, x):
+    def _log_abs_det(self, x):
         return (torch.log(torch.abs(self.power)) + (self.power - 1) * torch.log(x.abs() + self.eps)).sum(1)
     
     # Override methods
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_abs_det=False, **kwargs):
         u = torch.pow(x.abs(), self.power) * torch.sign(x)
         
-        if log_det:
-            return u, self._log_det(x)
+        if log_abs_det:
+            return u, self._log_abs_det(x)
         else:
             return u
         
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_abs_det=False, **kwargs):
         x = torch.pow(u.abs(), 1 / self.power) * torch.sign(u)
         
-        if log_det:
-            return x, -self._log_det(x)
+        if log_abs_det:
+            return x, -self._log_abs_det(x)
         else:
             return x
 
@@ -336,23 +277,23 @@ class Exponential(Flow):
         assert eps > 0
         self.eps = eps
 
-    def _log_det(self, x):
+    def _log_abs_det(self, x):
         return x.sum(1)
 
     # Override methods
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_abs_det=False, **kwargs):
         u = torch.exp(x) + self.eps
 
-        if log_det:
-            return u, self._log_det(x)
+        if log_abs_det:
+            return u, self._log_abs_det(x)
         else:
             return u
 
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_abs_det=False, **kwargs):
         x = torch.log(u.clamp(self.eps))
 
-        if log_det:
-            return x, -self._log_det(x)
+        if log_abs_det:
+            return x, -self._log_abs_det(x)
         else:
             return x 
 
@@ -374,7 +315,7 @@ class Sigmoid(Flow):
         self.alpha = alpha
         self.eps = eps
 
-    def _log_det(self, x):
+    def _log_abs_det(self, x):
         """Return log|det J_T|, where T: x -> u."""
         return (
             np.log(self.alpha) + 
@@ -383,21 +324,21 @@ class Sigmoid(Flow):
         ).sum(dim=1)
 
     # Override methods
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_abs_det=False, **kwargs):
         u = torch.sigmoid(self.alpha * x)
         u = u.clamp(self.eps, 1 - self.eps)
 
-        if log_det:
-            return u, self._log_det(x)
+        if log_abs_det:
+            return u, self._log_abs_det(x)
         else:
             return u
 
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_abs_det=False, **kwargs):
         u = u.clamp(self.eps, 1 - self.eps)
         x = -torch.log(1 / self.alpha / u - 1)
 
-        if log_det:
-            return x, -self._log_det(x)
+        if log_abs_det:
+            return x, -self._log_abs_det(x)
         else:
             return x
 
@@ -418,23 +359,23 @@ class Softplus(Flow):
         self.threshold = threshold
         self.eps = eps
 
-    def _log_det(self, x):
+    def _log_abs_det(self, x):
         return logsigmoid(x).sum(dim=1)
 
     # Override methods
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_abs_det=False, **kwargs):
         u = softplus(x, threshold=self.threshold, eps=self.eps)
 
-        if log_det:
-            return u, self._log_det(x)
+        if log_abs_det:
+            return u, self._log_abs_det(x)
         else:
             return u
 
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_abs_det=False, **kwargs):
         x = softplus_inv(u, threshold=self.threshold, eps=self.eps)
 
-        if log_det:
-            return x, -self._log_det(x)
+        if log_abs_det:
+            return x, -self._log_abs_det(x)
         else:
             return x 
 
@@ -451,25 +392,25 @@ class LogSigmoid(Flow):
 
         self.alpha = alpha
 
-    def _log_det(self, x):
+    def _log_abs_det(self, x):
         """Return log|det J_T|, where T: x -> u."""
 
         return logsigmoid(-self.alpha * x).sum(dim=1) + np.log(self.alpha)
 
     # Override methods
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_abs_det=False, **kwargs):
         u = logsigmoid(x, alpha=self.alpha)
 
-        if log_det:
-            return u, self._log_det(x)
+        if log_abs_det:
+            return u, self._log_abs_det(x)
         else:
             return u
 
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_abs_det=False, **kwargs):
         x = -softplus_inv(-u) / self.alpha
 
-        if log_det:
-            return x, -self._log_det(x)
+        if log_abs_det:
+            return x, -self._log_abs_det(x)
         else:
             return x
     
@@ -486,7 +427,7 @@ class LeakyReLU(Flow):
 
         self.negative_slope = negative_slope
 
-    def _log_det(self, x):
+    def _log_abs_det(self, x):
         return torch.where(
             x >= 0, 
             torch.zeros_like(x), 
@@ -495,19 +436,19 @@ class LeakyReLU(Flow):
 
 
     # Override methods
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_abs_det=False, **kwargs):
         u = torch.where(x >= 0, x, x * self.negative_slope)
 
-        if log_det:
-            return u, self._log_det(x)
+        if log_abs_det:
+            return u, self._log_abs_det(x)
         else:
             return u
 
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_abs_det=False, **kwargs):
         x = torch.where(u >= 0, u, u / self.negative_slope)
 
-        if log_det:
-            return x, -self._log_det(x)
+        if log_abs_det:
+            return x, -self._log_abs_det(x)
         else:
             return x
 
@@ -551,14 +492,12 @@ class BatchNorm(Flow):
         self.loc = nn.Parameter(torch.zeros(1, self.dim))
         self.log_scale = nn.Parameter(torch.zeros(1, self.dim))
 
-    def warm_start(self, x, **kwargs):
-        super().warm_start(x, **kwargs)
-        
+    def _warm_start(self, x, **kwargs):
         with torch.no_grad():
             self.batch_loc.data = x.mean(0, keepdim=True)
             self.batch_scale.data = x.std(0, keepdim=True) + self.eps
 
-        return self
+        super()._warm_start(x, **kwargs)
 
     def _batch_stats(self, x=None, update=None):
         if self.training and x is not None:
@@ -592,26 +531,26 @@ class BatchNorm(Flow):
 
         return bloc, bscale, loc, scale
 
-    def _log_det(self, bscale):
+    def _log_abs_det(self, bscale):
         if self.affine:
             return (self.log_scale - torch.log(bscale)).sum(dim=1)
         else:
             return -torch.log(bscale).sum(dim=1)
 
-    def _transform(self, x, *h, log_det=False, **kwargs):
+    def _transform(self, x, *h, log_abs_det=False, **kwargs):
         bloc, bscale, loc, scale = self._batch_stats(x)
         u = (x - bloc) / bscale 
         
         if self.affine:
             u = u * scale + loc
         
-        if log_det:
-            log_det = self._log_det(bscale)
-            return u, log_det
+        if log_abs_det:
+            log_abs_det = self._log_abs_det(bscale)
+            return u, log_abs_det
         else:
             return u
 
-    def _invert(self, u, *h, log_det=False, **kwargs):
+    def _invert(self, u, *h, log_abs_det=False, **kwargs):
         bloc, bscale, loc, scale = self._batch_stats()
         
         if self.affine:
@@ -619,53 +558,11 @@ class BatchNorm(Flow):
         else:
             x = u * bscale + bloc
         
-        if log_det:
-            log_det = -self._log_det(bscale)
-            return x, log_det
+        if log_abs_det:
+            log_abs_det = -self._log_abs_det(bscale)
+            return x, log_abs_det
         else:
             return x
-
-
-class ActNorm(Affine):
-    """Implementation of Activation Normalization.
-    https://arxiv.org/pdf/1807.03039.pdf
-
-    Uses Affine implementation and provides the warm_start method
-    to initialize Affine so that the transformed distribution
-    has location 0 and variance 1.
-
-    Note that ActNorm expects to call warm_start.
-    An assert blocks using it in any way before warm_start has been called.
-    """
-
-    def __init__(self, eps=1e-6, **kwargs):
-        """
-        Args:
-            eps (float): lower-bound for the weight tensor.
-        """
-        super().__init__(**kwargs)
-
-        self.register_buffer('eps', torch.tensor(eps))
-        self.register_buffer('initialized', torch.tensor(False))
-
-    def warm_start(self, x, **kwargs):
-        """Warm start for ActNorm.
-
-        Set loc and weight so that the transformed distribution
-        has location 0 and variance 1.
-        """
-
-        self.log_weight.data = -torch.log(x.std(0, keepdim=True) + self.eps)
-        self.bias.data = -(x * torch.exp(self.log_weight)).mean(0, keepdim=True)
-
-        self.initialized.data = torch.tensor(True).to(self.device)
-
-        return self
-
-    def _h(self):
-        assert self.initialized.item()
-
-        return super()._h()
 
 
 class Shuffle(Flow):
@@ -686,23 +583,23 @@ class Shuffle(Flow):
         self.register_buffer('perm', perm)
         self.register_buffer('inv_perm', torch.argsort(self.perm))
         
-    def _log_det(self, x):
+    def _log_abs_det(self, x):
         # By doing a permutation, det is always 1 or -1. 
         # Hence, log|det| is always 0.
         return torch.zeros_like(x[:, 0])
         
-    def _transform(self, x, log_det=False, **kwargs):
+    def _transform(self, x, log_abs_det=False, **kwargs):
         u = x[:, self.perm]
         
-        if log_det:
-            return u, self._log_det(x)
+        if log_abs_det:
+            return u, self._log_abs_det(x)
         else:
             return u
         
-    def _invert(self, u, log_det=False, **kwargs):
+    def _invert(self, u, log_abs_det=False, **kwargs):
         x = u[:, self.inv_perm]
         
-        if log_det:
-            return x, -self._log_det(x)
+        if log_abs_det:
+            return x, -self._log_abs_det(x)
         else:
             return x

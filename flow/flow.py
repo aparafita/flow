@@ -31,54 +31,59 @@ class UndefinedPriorException(Exception):
 class Flow(Module):
     r"""Base abstract class for any Flow. 
 
-    A Flow represents a diffeomorphic T such that U = T(X),
-    where X is the data distribution and U is the base distribution,
-    a standard Normal distribution by default.
+    A Flow represents a diffeomorphism T such that U = T(X),
+    where X is the data distribution and U is the base distribution
+    (i.e., a standard Normal distribution).
 
     Any class that inherits from Flow needs to implement:
     ```python
-    def _activation(self, h, **kwargs):
-        # Transform h by activation before calling _transform or _invert.
+    def _activation(self, theta, **kwargs):
+        # Transform theta parameters before calling _transform or _invert.
         # Returns a tuple with 0 or more activated parameters.
         ...
         
-    def _transform(self, x, *h, log_det=False, **kwargs): 
+    def _transform(self, x, *theta, log_abs_det=False, **kwargs): 
         # Transform x into u. Used for training.
         ...
 
-    def _invert(self, u, *h, log_det=False, **kwargs): 
+    def _invert(self, u, *theta, log_abs_det=False, **kwargs): 
         # Transform u into x. Used for sampling.
         ...
     ```
     
     Also, optionally, override these methods:
     ```python
-    def warm_start(self, x):
+    def _warm_start(self, x, *theta, **kwargs):
         # Warm start operation for the flow, if necessary.
         ...
         
-    def h_init(self):
-        # Return the pre-activation initialization value for the external parameters h.
-        # Shape must be (h_dim,).
+    def _theta_init(self):
+        # Return the pre-activation initialization value for the external parameters theta.
+        # Shape must be (theta_dim,).
         ...
     ```
     
-    Every flow must also define an `h_dim` attribute,
-    containing the total dimensionality of the external flow's parameters.
-    By this, it means that any paramater that is independent to the input
-    and can be stored as a nn.Parameter inside the flow is not considered.
-    External parameters come as a 'h' parameter of each function.
-    `h_dim` is then the total dimensionality of this h parameter.
-    `h_dim` can be 0 or a positive integer (0 by default, if it is not defined). 
-    Alternatively, you can set the `h_dim_1d` attribute 
-    to refer to the number of parameters per-dimension. 
-    This sets h_dim automatically as self.h_dim = self.h_dim_1d * self.dim.
+    Every flow must also define an `theta_dims` attribute,
+    containing a list with the dimensionality of the external flow's parameters 
+    for each dimension separately (they might be different).
+    Then, every method that receives theta, receives a tensor with
+    the first dimension's parameters in theta[:theta_dims[0]], 
+    followed by the second dimension's in theta[theta_dims[0]:theta_dims[1]], etc.
     
-    Both _transform and _invert may also return log|det J_T| if log_det is True.
-    Otherwise, they only return the transformed tensor.
+    Note that any paramater that is independent to the input
+    and can be stored as a nn.Parameter inside the flow is not considered.
+    
+    Along with the `theta_dims` attribute, there's a `theta_dim` attribute 
+    which sums all `theta_dims`. You can set either of them to set the other.
+        - Given `theta_dim`, then `theta_dims = (theta_dim // dim,) * dim`.
+        - Given `theta_dims`, set `theta_dim = sum(theta_dims)`.
+    
+    Both _transform and _invert have a log_abs_det parameter.
+    If log_abs_det is False, returns only the transformed tensor.
+    Otherwise, returns the transformed tensor and log|det J_T|.
 
-    Note that in training, using forward or backward KL divergence,
-    _transform or _invert should be differentiable w.r.t. the flow's parameters,
+    Note that in training, using forward/backward KL divergence,
+    _transform/_invert should be differentiable w.r.t. the flow's parameters,
     respectively. Otherwise, the flow would not learn.
 
     Remember that it's convenient for training stability to initialize
@@ -87,13 +92,31 @@ class Flow(Module):
     """
     
     @property
-    def h_dim_1d(self):
-        return self.h_dim // self.dim
+    def theta_dim(self):
+        return self._theta_dim
     
-    @h_dim_1d.setter
-    def h_dim_1d(self, value):
-        self.h_dim = value * self.dim
-
+    @theta_dim.setter
+    def theta_dim(self, value):
+        assert value % self.dim == 0
+        
+        self._theta_dim = value
+        self._theta_dims = (value // self.dim,) * self.dim
+        
+    @property
+    def theta_dims(self):
+        return self._theta_dims
+    
+    @theta_dims.setter
+    def theta_dims(self, value):
+        if isinstance(value, int):
+            value = (value,) * self.dim
+            
+        assert isinstance(value, (list, tuple)) and \
+            all(isinstance(x, int) and x >= 0 for x in value) and \
+            len(value) == self.dim
+        
+        self._theta_dims = tuple(value)
+        self._theta_dim = sum(self._theta_dims)
         
     def __init__(self, dim=1, prior=None):
         """
@@ -108,7 +131,7 @@ class Flow(Module):
         super().__init__()
 
         self.dim = dim
-        self.h_dim = 0 # by default, unless re-specified by the subclass
+        self.theta_dim = 0 # by default, unless re-specified by the subclass
         
         if prior is not None:
             self.prior = prior(dim=dim)
@@ -116,100 +139,106 @@ class Flow(Module):
             self.prior = None
 
 
-    def forward(self, t, h=None, invert=False, log_det=False, **kwargs):
+    def forward(self, t, theta=None, invert=False, log_abs_det=False, **kwargs):
         r"""Call _transform (x -> u) or _invert (u -> x) on t.
 
         Args:
             t (torch.Tensor): tensor to transform.
-            invert (bool): whether to call _transform (True) 
-                or _invert (False) on t.
-            log_det (bool): whether to return \(\log |\det J_T|\)
+            theta (torch.Tensor): theta parameter, if any. Can be None only if self.theta_dim == 0.
+            invert (bool): whether to call _transform (True) or _invert (False) on t.
+            log_abs_det (bool): whether to return \(\log |\det J_T|\)
                 of the current transformation T.
 
         Returns:
             t: transformed tensor, either u if invert=False
                 or x if invert=True.
-            log_det: only returned if log_det=True.
+            log_abs_det: only returned if log_abs_det=True.
                 Tensor containing \(\log |\det J_T|\), 
                 where T is the applied transformation. 
         """
-        assert not self.h_dim or h is not None, 'If h_dim > 0, then h should be passed.'
-        h = self._activation(h, **kwargs)
-        assert isinstance(h, tuple), 'trnf._activation(h) must return a tuple'
+        assert (not self.theta_dim or theta is not None) and \
+            (theta is None or self.theta_dim), 'theta_dim > 0 iif. theta is not None.'
+        
+        theta = self._activation(theta, **kwargs)
+        assert isinstance(theta, (list, tuple)), 'trnf._activation(h) must return a tuple'
 
         if not invert:
-            return self._transform(t, *h, log_det=log_det, **kwargs)
+            return self._transform(t, *theta, log_abs_det=log_abs_det, **kwargs)
         else:
-            return self._invert(t, *h, log_det=log_det, **kwargs)
-
-
-    # Override these methods
-    def _activation(self, h, **kwargs):
-        """Transform h by activation before calling _transform or _invert.
+            return self._invert(t, *theta, log_abs_det=log_abs_det, **kwargs)
+        
+    def warm_start(self, x, theta=None, **kwargs):
+        """Perform a warm_start operation to the flow (optional).
 
         Args:
-            h (torch.Tensor): tensor with the pre-activation parameters.
+            x (torch.Tensor): dataset sample to use in warming up.
+            theta (torch.Tensor): external parameters or None.
+
+        Returns:
+            self
+        """
+        super().warm_start(x)
+        
+        theta = self._activation(theta, **kwargs)
+        self._warm_start(x, *theta, **kwargs)
+        
+        return self
+
+    # Override these methods
+    def _activation(self, theta, **kwargs):
+        """Transform theta by activation before calling _transform or _invert.
+
+        Args:
+            theta (torch.Tensor): tensor with the pre-activation parameters.
         
         Returns:
             parameters: tuple of parameter tensors.
 
         Example:
-            For a scale parameter, _activation could pass h
+            For a scale parameter, _activation could pass theta
             through a softplus function to make it positive.
         """
-        return (h,) if h is not None else tuple()
+        return (theta,) if theta is not None else tuple()
         
-    def _transform(self, x, h=None, log_det=False, **kwargs):
+    def _transform(self, x, *theta, log_abs_det=False, **kwargs):
         """Transform x into u."""
         raise NotImplementedError()
 
-    def _invert(self, u, h=None, log_det=False, **kwargs):
+    def _invert(self, u, *theta, log_abs_det=False, **kwargs):
         """Transform u into x."""
         raise NotImplementedError()
         
-    def _h_init(self):
-        """Return initialization values for pre-activation h parameters.
+    def _theta_init(self):
+        """Return initialization values for pre-activation theta parameters.
         
         Returns:
             result: None if no initialization is required or
-                tensor with shape (h_dim,) with the initialization values.
+                tensor with shape (theta_dim,) with the initialization values.
         """
         return None # by default, no initialization suggested
-
-    def warm_start(self, x, h=None, **kwargs):
-        """Perform a warm_start operation to the flow (optional).
-
-        Args:
-            x (torch.Tensor): dataset sample to use in warming up.
-            h (torch.Tensor): external parameters or None.
-
-        Returns:
-            self
-        """
-        return super().warm_start()
-
+    
+    def _warm_start(self, x, *theta, **kwargs):
+        return # does nothing by default
 
     # Utilities
-    def sample(self, n, **kwargs):
+    def sample(self, n, *args, **kwargs):
         """Generate n samples from X."""
-        if self.prior is None: 
-            raise UndefinedPriorException(self)
+        if self.prior is None: raise UndefinedPriorException(self)
         
         u = self.prior.sample(n)
-        x = self(u, **kwargs, invert=True)
+        x = self(u, *args, **kwargs, invert=True, log_abs_det=False)
 
         return x
 
-    def loglk(self, x, **kwargs):
+    def loglk(self, x, *args, **kwargs):
         """Compute the log-likelihood of samples x.
         """
-        if self.prior is None: 
-            raise UndefinedPriorException(self)
+        if self.prior is None: raise UndefinedPriorException(self)
 
-        u, log_det = self(x, **kwargs, log_det=True)
-        assert len(log_det.shape) == 1
+        u, log_abs_det = self(x, *args, **kwargs, invert=False, log_abs_det=True)
+        assert log_abs_det.shape == (x.size(0),)
 
-        return self.prior.loglk(u) + log_det
+        return self.prior.loglk(u) + log_abs_det
     
     def nll(self, *args, **kwargs):
         """Compute the *negative* log-likelihood of samples x.
@@ -221,7 +250,7 @@ class Flow(Module):
         """
         return -self.loglk(*args, **kwargs)
 
-    def reverse_kl(self, n, loglk_f, **kwargs):
+    def reverse_kl(self, n, loglk_f, *args, **kwargs):
         """Compute the reverse KL divergence of n prior samples.
 
         Used to train flows in reverse mode.
@@ -231,19 +260,18 @@ class Flow(Module):
             n (int): number of samples.
             loglk_f (function): log-density function(x, **kwargs) for x.
         """
-        if self.prior is None: 
-            raise UndefinedPriorException(self)
+        if self.prior is None: raise UndefinedPriorException(self)
 
         u = self.prior.sample(n)
         loglk_u = self.prior.loglk(u)
 
-        x, log_det = self(u, log_det=True, invert=True, **kwargs)
-        assert log_det.shape == (n,)
+        x, log_abs_det = self(u, *args, log_abs_det=True, invert=True, **kwargs)
+        assert log_abs_det.shape == (n,)
 
         loglk_x = loglk_f(x, **kwargs)
         assert loglk_x.shape == (n,)
 
-        return loglk_u - log_det - loglk_x
+        return loglk_u - log_abs_det - loglk_x
 
 
 def inv_flow(flow_cls, name=None):
@@ -266,17 +294,19 @@ def inv_flow(flow_cls, name=None):
     InvFlow.__name__ = name
     InvFlow.__doc__ = (
         'Inverse flow. Note that _transform and _invert '
-        'are swapped in this Flow.\n'
+        'are swapped when calling this Flow.\n'
     ) + __doc__
 
     return InvFlow
 
 
 class Conditioner(Flow):
-    """Implement Flow by use of a conditioner and a transformer.
+    """Implement Flow by use of a Conditioner and a Transformer.
 
     This class is the conditioner itself, but acts as a flow,
     and receives the transformer as an input for its constructor. 
+    The Transformer can be any other Flow that has theta_dim > 0.
+    The Conditioner is the one responsible for providing that external theta.
 
     Can also be used as a Conditional Flow, meaning, 
     a given input tensor conditions on the distribution modelled by the Flow.
@@ -287,13 +317,13 @@ class Conditioner(Flow):
 
     Any class that inherits from Conditioner needs to implement:
     ```python
-    def _h(self, x, cond=None, **kwargs): 
-        # Return the (non-activated) tensor of parameters h 
+    def _theta(self, x, cond=None, **kwargs): 
+        # Return the (non-activated) tensor of parameters theta 
         # corresponding to the given x. If this is a conditional flow,
         # the conditioning tensor is passed as the 'cond' kwarg.
         ...
 
-    def _invert(self, u, cond=None, log_det=False, **kwargs): 
+    def _invert(self, u, cond=None, log_abs_det=False, **kwargs): 
         # Transform u into x.
         ...
     ```
@@ -303,13 +333,13 @@ class Conditioner(Flow):
     However, it does need one for _invert, 
     since it depends on the implemented conditioner.
 
-    Note that `Transformer` exposes a _h_init method that, 
+    Note that the transformer has a _theta_init method that, 
     if it doesn't return None, should return an initialization value 
-    for pre-activation parameters h. This is useful to initialize
+    for pre-activation parameters theta. This is useful to initialize
     a Flow to the identity transformation, for training stability.
-    For example, if your conditioner returns h as the result 
+    For example, if your conditioner returns theta as the result 
     of a feed-forward MLP, you could initialize all weights and biases 
-    as randn() * 1e-3, and the last layer biases as the result of _h_init.
+    as randn() * 1e-3, and the last layer biases as the result of _theta_init.
     """
 
 
@@ -330,7 +360,7 @@ class Conditioner(Flow):
         super().__init__(dim=dim, **kwargs)
 
         self.trnf = trnf
-        self.h_dim = 0 # as the conditioner takes care of trnf.h_dim
+        self.theta_dim = 0 # as the conditioner takes care of trnf.theta_dim
         
         assert cond_dim >= 0
         self.cond_dim = cond_dim
@@ -353,35 +383,29 @@ class Conditioner(Flow):
                 raise ValueError(
                     f'Invalid cond dim {cond.size(1)}; expected {self.cond_dim}'
                 )
-        elif cond is not None:
-            raise ValueError('Passing cond != None to non-conditional flow')
 
         return super().forward(*args, cond=cond, **kwargs)
 
-    def _transform(self, x, *h, log_det=False, cond=None, **kwargs):
-        assert not h
-        h = self._h(x, cond=cond, **kwargs)
+    def _transform(self, x, *theta, cond=None, log_abs_det=False, **kwargs):
+        assert not theta
+        theta = self._theta(x, cond=cond, **kwargs)
         
-        return self.trnf(x, h=h, log_det=log_det, **kwargs)
+        return self.trnf(x, theta=theta, log_abs_det=log_abs_det, **kwargs)
 
     # Extend warm_start to also call trnf.warm_start
-    def warm_start(self, x, h=None, cond=None, **kwargs):
-        super().warm_start(x, h=h, cond=cond, **kwargs)
+    def _warm_start(self, x, cond=None, **kwargs):
+        super()._warm_start(x, cond=cond, **kwargs)
     
-        assert h is None
-        h = self._h(x, cond=cond, **kwargs)
-        self.trnf.warm_start(x, h=h, **kwargs)
-
-        return self
+        theta = self._theta(x, cond=cond, **kwargs)
+        self.trnf.warm_start(x, theta=theta, **kwargs)
 
     # Override these methods
-    def _h(self, x, cond=None, **kwargs):
+    def _theta(self, x, cond=None, **kwargs):
         """Compute the non-activated parameters for the transformer."""
         raise NotImplementedError()
 
-    def _invert(self, u, *h, log_det=False, cond=None, **kwargs):
+    def _invert(self, u, cond=None, log_abs_det=False, **kwargs):
         """Transform u into x."""
-        assert not h
         raise NotImplementedError()
 
 
@@ -390,36 +414,43 @@ class Sequential(Flow):
 
     Note that flows are specified in the order X -> U.
     That means, for a Sequential Flow with steps T1, T2, T3: U = T3(T2(T1(X))).
+    
+    If any internal flow has theta_dim > 0, this Flow inherits it.
+    A Conditioner will be needed to get the values of all external parameters.
+    
+    As an example,
+    ```python
+    flow = Sequential(Linear, Linear, Constant(Linear(dim=3)), dim=3)
+    ```
+    
+    Note that you can pass instanced flows (`Constant(Linear(dim=3))`)
+    or Flow classes / functions(dim=1) that return flows. 
+    If an entry parameter f in *flows is not instanced, 
+    it will be called like f(dim=dim) and expected to return a Flow with that dimension.
+    
+    In the example, Linear has a mu and sigma parameter for each dimension.
+    Hence, theta_dim of the Sequential will be 2 * 3 + 2 * 3 = 12, 
+    with the first 6 dimensions passed to the first flow, the remaining to the other.
     """
 
-    def __init__(self, *flow_cls, dim=1, **kwargs):
+    def __init__(self, *flows, dim=1, **kwargs):
         """
         Args:
             *flows (Flow): sequence of flows.
+            dim (int): dimensionality of the flow.
         """
-        pass
-        """
-        assert flows, 'Sequential constructor called with 0 flows'
-
-        dim = { flow.dim for flow in flows }
-        assert len(dim) == 1, \
-            'All flows in a Sequential must have the same dim'
-        dim = dim.pop() # just the one
-        assert dim == kwargs.pop('dim', dim), 'dim and flows dim do not match'
+        
+        assert flows, 'At least one subflow must be provided.'
         
         super().__init__(dim=dim, **kwargs)
         
-        self.flows = nn.ModuleList(flows) # save flows in ModuleList
-        """
+        self.flows = nn.ModuleList([ f if isinstance(f, Flow) else f(dim=dim) for f in flows ])
+        assert all(f.dim == self.dim for f in self.flows)
         
-        assert flow_cls
-        
-        super().__init__(dim=dim, **kwargs)
-        
-        self.flows = nn.ModuleList([ cls(dim=dim) for cls in flow_cls ])
-        
-        self.h_dims = [ f.h_dim for f in self.flows ]
-        self.h_dim = sum(self.h_dims)        
+        self.theta_dims = tuple(
+            sum( f.theta_dims[i] for f in self.flows )
+            for i in range(self.dim)
+        )
 
     # Device overrides
     def _update_device(self, device):
@@ -429,24 +460,40 @@ class Sequential(Flow):
             flow.device = device
 
     # Method overrides
-    def _activation(self, h, **kwargs):
-        assert not self.h_dim or (h is not None and h.size(1) == self.h_dim)
+    def _activation(self, theta, **kwargs):
+        assert not self.theta_dim or (theta is not None and theta.size(1) == self.theta_dim)
         
-        if h is not None:
-            h = h.view(h.size(0), self.dim, -1)
+        if theta is not None:
+            index = []
+            s = 0
+            for i in self.theta_dims:
+                index.append(s)
+                s += i
+            
             res = []
-            i = 0
             for flow in self.flows:
-                j = i + flow.h_dim_1d
+                theta2 = []
                 
-                if j - i:
-                    res.append(h[..., i:j].flatten(1))
+                for k in range(self.dim):
+                    i = index[k]
+                    j = i + flow.theta_dims[k]
+                    
+                    if j - i:
+                        theta2.append(theta[:, i:j])
+                        index[k] = j
+                        
+                if theta2:
+                    res.append(torch.cat(theta2, dim=1))
                 else:
                     res.append(None)
-
-                i = j
         else:
-            res = [None] * len(self)
+            res = [None] * len(self.flows)
+            
+        assert len(res) == len(self.flows) and all(
+            theta.size(1) == flow.theta_dim
+            for theta, flow in zip(res, self.flows)
+            if theta is not None
+        )
         
         return tuple(res)
         
@@ -456,54 +503,71 @@ class Sequential(Flow):
     def _invert(self, *args, **kwargs):
         return self._forward(*args, **kwargs, invert=True)
     
-    def _forward(self, x, *h, log_det=False, invert=False, **kwargs):
-        log_det_sum = torch.zeros(1, device=x.device)
-        it = zip(range(len(self) - 1, -1, -1), reversed(self.flows)) if invert else enumerate(self.flows)
-        for n, flow in it:
-            res = flow(x, h=h[n], invert=invert, log_det=log_det, **kwargs)
+    def _forward(self, x, *theta, log_abs_det=False, invert=False, **kwargs):
+        log_abs_det_sum = 0.
+        for n, flow in (
+            enumerate(self.flows) if not invert else
+            zip(range(len(self) - 1, -1, -1), reversed(self.flows))
+        ):
+            res = flow(x, theta=theta[n], invert=invert, log_abs_det=log_abs_det, **kwargs)
 
-            if log_det:
-                x, log_det_i = res
-                assert len(log_det_i.shape) == 1
+            if log_abs_det:
+                x, log_abs_det_i = res
+                assert len(log_abs_det_i.shape) == 1
 
-                log_det_sum = log_det_sum + log_det_i
+                log_abs_det_sum = log_abs_det_sum + log_abs_det_i
             else:
                 x = res
 
-        if log_det:
-            return x, log_det_sum
+        if log_abs_det:
+            return x, log_abs_det_sum
         else:
             return x
         
-    def _h_init(self):
-        """Return initialization values for pre-activation h parameters.
+    def _theta_init(self):
+        """Return initialization values for pre-activation theta parameters.
         
         Returns:
             result: None if no initialization is required or
-                tensor with shape (h_dim,) with the initialization values.
+                tensor with shape (theta_dim,) with the initialization values.
         """
-        return torch.cat([
-            init.view(self.dim, -1)
-            for init in (f._h_init() for f in self.flows)
-            if init is not None
-        ], 1).flatten()
+        
+        init = [[] for _ in range(self.dim)]
+        
+        for flow in self.flows:
+            theta_init = flow._theta_init()
+            if theta_init is not None:
+                i = 0
+                for k, d in enumerate(flow.theta_dims):
+                    j = i + d
+                    assert j <= theta_init.size(0)
+                    if j - i:
+                        init[k].append(theta_init[i:j])
+                        i = j
+        
+        if any(l for l in init):
+            return torch.cat([
+                torch.cat(l, 0)
+                for l in init
+                if l
+            ], 0)
+        else:
+            return None
     
-    # Utilities
-    def warm_start(self, x, h=None, **kwargs):
+    # Utilities    
+    def _warm_start(self, x, *theta, **kwargs):
         """Call warm_start(x, **kwargs) to each subflow.
 
         Note that x will be progressively transformed before each 
         call to warm_start, from x to u.
         """
-        h = self._activation(h, **kwargs)
-
+        super()._warm_start(x, *theta, **kwargs)
+        
         for n, flow in enumerate(self.flows):
-            flow.warm_start(x, h=h[n], **kwargs)
+            flow.warm_start(x, theta=theta[n], **kwargs)
 
             with torch.no_grad():
-                x = flow(x, h=h[n], **kwargs)
-
-        return super().warm_start(x, h=h, **kwargs)
+                x = flow(x, theta=theta[n], **kwargs)
 
     def __getitem__(self, k):
         """Access subflows by indexing. 
@@ -514,303 +578,50 @@ class Sequential(Flow):
 
         if isinstance(k, int):
             return self.flows[k]
-        elif isinstance(k, slice):
-            return Sequential(*self.flows[k])
         else:
             raise ValueError(k)
 
     def __iter__(self):
-        for flow in self.flows:
-            yield flow
+        return iter(self.flows)
             
     def __len__(self):
         return len(self.flows)
-        
-        
-class ConditionerNet(Module):
-    """Conditioner parameters network.
-
-    Used to compute the parameters h passed to a transformer.
-    If its input_dim is 0 (i.e., a Flow of dimension 1 without conditioning),
-    returns a learnable tensor containing the required result.
-    """
-
-    def __init__(
-        self, 
-        input_dim, output_dim, h_init=None, net_f=None
-    ):
-        """
-        Args:
-            input_dim (int): input dimensionality.
-            output_dim (int): output dimensionality. 
-                Total dimension of all parameters combined.
-            h_init (torch.Tensor): tensor of shape (output_dim,) to use as initializer.
-                If None, original initialization used.
-            net_f (function): function net_f(input_dim, output_dim, init=None)
-                that creates a network with the given input and output dimensions,
-                and possibly receives an init Tensor that,
-                when not None, indicates that the function should be set 
-                so that it always return that tensor. 
-                This helps in initializing a tensor to the identity.
-        """
-        assert net_f is not None
-        
-        super().__init__()
-        
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-
-        if h_init is not None:
-            assert h_init.shape == (output_dim,)
-            
-        if input_dim:
-            self.net = net_f(input_dim, output_dim, init=h_init)
-        else:
-            if h_init is None:
-                h_init = torch.randn(output_dim)
-
-            self.parameter = nn.Parameter(h_init.unsqueeze(0))
-
-    def forward(self, x):
-        """Feed-forward pass."""
-        if self.input_dim:
-            return self.net(x)
-        else:
-            return self.parameter.repeat(x.size(0), 1)
-
-    def warm_start(self, x, **kwargs):
-        super().warm_start(x, **kwargs)
-        
-        if self.input_dim:
-            bn = self.net[0]
-            assert bn.__class__.__name__.startswith('BatchNorm')
-
-            bn.running_mean.data = x.mean(0)
-            bn.running_var.data = x.var(0)
-        
-        return self
     
-'''    
-class Sequential1D(Sequential):
-    """Flow defined by a sequence of 1D-flows.
     
-    This makes it possible to define a single conditioner for all subflows,
-    helping in mitigating overfitting.
-    """
-
-    def __init__(self, *flows, cond_dim=0, net_f=None, **kwargs):
-        """
-        Args:
-            *flows (Flow): sequence of flows.
-            dim (int): dimensions of the flow.
-            cond_dim (int): dimensions of the conditioning input.
-            net_f (function): function(input_dim, output_dim, init=None).
-                input_dim will actually be the passed cond_dim.
-                Note that the actual network will be a `ConditionerNet`,
-                which admits cond_dim == 0, in which case a single parameter
-                will be trained instead of the network returned by net_f.
-        """
-        
-        assert kwargs.pop('dim', 1) == 1 # only works with 1D flows
-        assert net_f is not None
-
-        super().__init__(*flows, dim=1, **kwargs)
-        
-        self.cond_dim = cond_dim
-        self.h_dims = [ getattr(flow, 'h_dim', 0) for flow in self ]
-        self.h_dim = sum(self.h_dims)
-        
-        init = [
-            m()
-            for m in (getattr(flow, '_h_init', None) for flow in self) 
-            if m is not None
-        ]
-        
-        if init: init = torch.cat(init, -1)
-        else: init = None
-        
-        self.net = ConditionerNet(self.cond_dim, self.h_dim, h_init=init, net_f=net_f)
-
-    # Method overrides
-    def _create_n_kwargs(self, x, kwargs):
-        # Compute h once, and set it as layer-specific kwargs
-        cond = kwargs.pop('cond', None)
-        if cond is None:
-            cond = x[:, :0] # to get the appropriate size(0)
-            
-        h = self.net(cond)
-        
-        i = 0
-        for n, h_dim in enumerate(self.h_dims):
-            if h_dim: 
-                kwargs[f'__{n}_h'] = h[:, i:i + h_dim]
-                i += h_dim
-            
-    def forward(self, x, invert=False, log_det=False, **kwargs):
-        self._create_n_kwargs(x, kwargs)
-        
-        return super().forward(x, invert=invert, log_det=log_det, **kwargs)
-        
-    def warm_start(self, x, **kwargs):
-        self._create_n_kwargs(x, kwargs)
-        
-        return super().warm_start(x, **kwargs)
-
-    # Utilities
-    def __getitem__(self, k):
-        """Access subflows by indexing. 
-
-        Single ints return the corresponding subflow, 
-        while slices return a `Sequential` of the corresponding subflows.
-        """
-        
-        if isinstance(k, slice):
-            raise ValueError("Can't slice a Sequential1D") 
-            # since we would need to slice the network
-        else:
-            return super().__getitem__(k)
-'''
-
-def dec_trnf_1d(func):
-    """Decorator used to define a _transform/_invert method as a 1D operation.
-    If multiple dimensions are passed, the method will be called individually
-    per dimension and the results will be aggregated by this decorator."""
+# TODO: Remove this   
+# def dec_trnf_1d(func):
+#     """Decorator used to define a _transform/_invert method as a 1D operation.
+#     If multiple dimensions are passed, the method will be called individually
+#     per dimension and the results will be aggregated by this decorator."""
     
-    from functools import wraps
+#     from functools import wraps
     
-    @wraps(func)
-    def f(self, x, *args, **kwargs):
-        t = []
+#     @wraps(func)
+#     def f(self, x, *args, log_abs_det=False, **kwargs):
+#         t = []
+#         log_abs_det_sum = 0
         
-        log_det = kwargs.get('log_det', False)
-        log_det_sum = 0
-        
-        for d in range(x.size(1)):
-            res = func(
-                self, x[:, [d]],
-                # all args are assumed to be tensors
-                *(a[:, [d]] for a in args), 
-                **kwargs
-            )
+#         for d in range(x.size(1)):
+#             res = func(
+#                 self, x[:, [d]],
+#                 # all args are assumed to be tensors
+#                 *(a[:, [d]] for a in args), 
+#                 log_abs_det=log_abs_det,
+#                 **kwargs
+#             )
             
-            if log_det:
-                t_i, log_det_i = res
-                log_det_sum += log_det_i
-            else:
-                t_i = res
+#             if log_abs_det:
+#                 t_i, log_abs_det_i = res
+#                 log_abs_det_sum += log_abs_det_i
+#             else:
+#                 t_i = res
                 
-            t.append(t_i)
+#             t.append(t_i)
             
-        t = torch.cat(t, 1)
-        if log_det:
-            return t, log_det_sum
-        else:
-            return t
+#         t = torch.cat(t, 1)
+#         if log_abs_det:
+#             return t, log_abs_det_sum
+#         else:
+#             return t
         
-    return f
-
-'''
-class Transformer(Flow):
-    """Transformer class used as a part of any Conditioner-Flow.
-
-    Any class that inherits from Transformer needs to implement:
-    ```python
-    def __init__(self, **kwargs):
-        # Extend the constructor to pass, to its base class,
-        # the required kwarg h_dim >= 0. 
-        ...
-        super().__init__(h_dim=h_dim, **kwargs)
-        ...
-
-    def _activation(self, h, **kwargs): 
-        # Transform h by activation before calling _transform or _invert.
-        # 
-        # For example, for a scale parameter, _activation could pass h
-        # through a softplus function to make it positive.
-        #
-        # Must return a tuple with the activated tensor parameters (even if it's just one).
-        ...
-
-    def _transform(self, x, *h, log_det=False, **kwargs): 
-        # Transform x into u using parameters h.
-        ...
-
-    def _invert(self, u, *h, log_det=False, **kwargs):
-        # Transform u into x using parameters h.
-        ...
-    ```
-    Also, any subclass must define their `h_dim` attribute.
-    As an example, an Affine transformer has h_dim=2 * self.dim 
-    (loc and scale, one for each dimension).
-
-    Note that forward, _transform and _invert all receive h,
-    that contains the parameters for the transformation.
-
-    CAUTION: all the three first methods need to be general enough 
-        to work with dim=1 or an arbitrary dim,
-        since the conditioner might pass any number of dimensions
-        to transform depending on how it works.
-    """
-
-    def forward(self, t, h, invert=False, log_det=False, **kwargs):
-        r"""Call _activation(h) and pass it to _transform or _invert.
-
-        Args:
-            t (torch.Tensor): tensor to transform.
-            h (torch.Tensor): parameters for the transformation, 
-                to be pre-processed with _activation. 
-                This tensor comes from Conditioner._h.
-            invert (bool): whether to call _transform (True) 
-                or _invert (False) on t.
-            log_det (bool): whether to return \(\log |\det J_T|\)
-                of the current transformation T.
-
-        Returns:
-            t: transformed tensor, either u if invert=False
-                or x if invert=True.
-            log_det: only returned if log_det=True.
-                Tensor containing \(\log |\det J_T|\), 
-                where T is the applied transformation. 
-        """
-
-        h = self._activation(h, **kwargs)
-        assert isinstance(h, tuple), 'trnf._activation(h) must return a tuple'
-
-        if not invert: 
-            return self._transform(t, *h, log_det=log_det, **kwargs)
-        else:
-            return self._invert(t, *h, log_det=log_det, **kwargs)
-
-
-    # Override these methods
-    def _activation(self, h, **kwargs):
-        """Transform h by activation before calling _transform or _invert.
-
-        Args:
-            h (torch.Tensor): tensor with the pre-activation parameters.
-        
-        Returns:
-            parameters: tuple of parameter tensors.
-
-        Example:
-            For a scale parameter, _activation could pass h
-            through a softplus function to make it positive.
-        """
-        raise NotImplementedError()
-
-    def _transform(self, x, *h, log_det=False, **kwargs):
-        raise NotImplementedError()
-
-    def _invert(self, u, *h, log_det=False, **kwargs):
-        raise NotImplementedError()
-
-    def _h_init(self):
-        """Return initialization values for pre-activation h parameters.
-        
-        Returns:
-            result: None if no initialization is required or
-                tensor with shape (h_dim,) with the initialization values.
-        """
-        return None # by default, no initialization suggested
-'''
-Transformer = Flow
+#     return f

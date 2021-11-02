@@ -7,7 +7,9 @@ negative log-likelihood (nll) of a sample u.
 Classes:
 
 * `Prior`: abstract class for a prior.
+* `Uniform`: Uniform(0, 1) distribution.
 * `Normal`: standard normal distribution (uni- or multivariate).
+* `Exponential`: Exponential(1) distribution.
 """
 
 import numpy as np
@@ -31,6 +33,7 @@ class Prior(Module):
         # Return the log-likelihood of each sample in u.
         ...
     ```
+    
     Additionally, a class attribute `discrete` must be defined 
     indicating whether this Prior is discrete (True) or continuous (False).
     Defaults to False.
@@ -58,16 +61,24 @@ class Prior(Module):
     def nll(self, u):
         """Return the negative log-likelihood of samples u."""
         return -self.loglk(u)
+    
+    def __repr__(self):
+        return f'{self.__class__.__name__}Prior({self.dim})'
 
 
 class Uniform(Prior):
     """Prior for a Uniform(0, 1) distribution."""
+    
+    def __init__(self, *args, eps=1e-9, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.register_buffer('eps', torch.tensor(eps))
 
     def sample(self, n):
-        return torch.rand(n, self.dim, device=self.device)
+        return torch.rand(n, self.dim, device=self.device) * (1 - self.eps) + self.eps / 2
 
     def loglk(self, u):
-        return torch.zeros_like(u[:, 0])
+        return -torch.full_like(u[:, 0], torch.log(1 - self.eps))
 
 
 class Normal(Prior):
@@ -89,8 +100,8 @@ class Exponential(Prior):
         self.register_buffer('eps', torch.tensor(eps))
     
     def sample(self, n):
-        u = torch.rand(n, 1, device=self.device).clip(self.eps / 2, 1 - self.eps / 2)
+        u = torch.rand(n, 1, device=self.device) * (1 - self.eps) + self.eps / 2
         return -torch.log(u)
     
     def loglk(self, u):
-        return -u.sum(1)
+        return (-torch.log(1 - self.eps) - u).sum(1)
